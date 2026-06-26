@@ -8,7 +8,7 @@ variable "vpc_resources" {
   })
 
   default = {
-    vpc = "nsse-vpc"
+    vpc = "devopsproject-vpc"
 
   }
 }
@@ -20,7 +20,7 @@ variable "tags" {
   })
 
   default = {
-    Project     = "nsse",
+    Project     = "devopsproject",
     Environment = "production"
   }
 }
@@ -32,8 +32,8 @@ variable "assume_role" {
   })
 
   default = {
-    role_arn    = "<YOUR_ROLE_ARN>"
-    external_id = "<YOUR_EXTERNAL_ID>"
+    role_arn    = "arn:aws:iam::794038226274:role/terraform-role"
+    external_id = "f5deb027-47e2-4079-bdaf-26c0beac6216"
   }
 }
 
@@ -48,12 +48,12 @@ variable "ec2_resources" {
   })
 
   default = {
-    key_pair_name                = "nsse-production-key-pair"
-    instance_role                = "nsse-production-instance-role"
-    instance_profile             = "nsse-production-instance-profile"
-    control_plane_security_group = "nsse-production-control-plane-security-group"
-    alb_security_group           = "nsse-production-alb-security-group"
-    worker_security_group        = "nsse-production-worker-security-group"
+    key_pair_name                = "devopsproject-production-key-pair"
+    instance_role                = "devopsproject-production-instance-role"
+    instance_profile             = "devopsproject-production-instance-profile"
+    control_plane_security_group = "devopsproject-production-control-plane-security-group"
+    alb_security_group           = "devopsproject-production-alb-security-group"
+    worker_security_group        = "devopsproject-production-worker-security-group"
   }
 }
 
@@ -72,7 +72,7 @@ variable "control_plane_launch_template" {
   })
 
   default = {
-    name                                 = "nsse-production-debian-control-plane-lt"
+    name                                 = "devopsproject-production-debian-control-plane-lt"
     disable_api_stop                     = true
     disable_api_termination              = true
     instance_type                        = "t3.medium"
@@ -100,7 +100,7 @@ variable "worker_launch_template" {
   })
 
   default = {
-    name                                 = "nsse-production-debian-worker-lt"
+    name                                 = "devopsproject-production-debian-worker-lt"
     disable_api_stop                     = true
     disable_api_termination              = true
     instance_type                        = "t3.micro"
@@ -131,14 +131,14 @@ variable "control_plane_auto_scaling_group" {
   })
 
   default = {
-    name                      = "nsse-production-control-plane-asg"
+    name                      = "devopsproject-production-control-plane-asg"
     max_size                  = 2
     min_size                  = 2
     desired_capacity          = 2
     health_check_grace_period = 180
     health_check_type         = "EC2"
     instance_tags = {
-      Name = "nsse-production-control-plane"
+      Name = "devopsproject-production-control-plane"
     }
     instance_maintenance_policy = {
       min_healthy_percentage = 100
@@ -166,15 +166,15 @@ variable "worker_auto_scaling_group" {
   })
 
   default = {
-    name                            = "nsse-production-worker-asg"
-    cluster_auto_scaler_policy_name = "nsse-production-cluster-autoscaler-policy"
+    name                            = "devopsproject-production-worker-asg"
+    cluster_auto_scaler_policy_name = "devopsproject-production-cluster-autoscaler-policy"
     max_size                        = 5
     min_size                        = 4
     desired_capacity                = 4
     health_check_grace_period       = 180
     health_check_type               = "EC2"
     instance_tags = {
-      Name = "nsse-production-worker"
+      Name = "devopsproject-production-worker"
     }
     instance_maintenance_policy = {
       min_healthy_percentage = 100
@@ -276,14 +276,14 @@ variable "logs_bucket" {
   })
 
   default = {
-    bucket        = "nsse-production-logs"
+    bucket        = "devopsproject-production-logs"
     force_destroy = true
   }
 }
 
 variable "bucket_ssm" {
   type    = string
-  default = "not-so-simple-ecommerce-ansible-ssm"
+  default = "devopsproject-ansible-ssm"
 }
 
 variable "network_load_balancer" {
@@ -305,11 +305,11 @@ variable "network_load_balancer" {
   })
 
   default = {
-    name               = "nsse-production-cp-nlb"
+    name               = "devopsproject-prod-cp-nlb"
     internal           = true
     load_balancer_type = "network"
     default_tg = {
-      name               = "nsse-production-cp-nlb-tcp-tg"
+      name               = "devopsproject-prod-cp-nlb-tcp-tg"
       target_type        = "instance"
       port               = 6443
       protocol           = "TCP"
@@ -335,8 +335,8 @@ variable "node_termination" {
 
   default = {
     queue_name                = "NodeTerminationQueue"
-    role_name                 = "nsse-production-node-termination-role"
-    policy_name               = "nsse-production-node-termination-policy"
+    role_name                 = "devopsproject-prod-node-termination-role"
+    policy_name               = "devopsproject-prod-node-termination-policy"
     hook_name                 = "NodeTerminationNotification"
     hook_default_result       = "CONTINUE"
     hook_heartbeat_timeout    = 300
@@ -352,27 +352,27 @@ variable "ecr_repositories" {
 
   default = [
     {
-      name                 = "nsse/production/health-checker"
+      name                 = "devopsproject/prod/health-checker"
       image_tag_mutability = "MUTABLE"
     },
     {
-      name                 = "nsse/production/notificator"
+      name                 = "devopsproject/prod/notificator"
       image_tag_mutability = "MUTABLE"
     },
     {
-      name                 = "nsse/production/order"
+      name                 = "devopsproject/prod/order"
       image_tag_mutability = "MUTABLE"
     },
     {
-      name                 = "nsse/production/invoice-generator"
+      name                 = "devopsproject/prod/invoice-generator"
       image_tag_mutability = "MUTABLE"
     },
     {
-      name                 = "nsse/production/identity-server"
+      name                 = "devopsproject/prod/identity-server"
       image_tag_mutability = "MUTABLE"
     },
     {
-      name                 = "nsse/production/main"
+      name                 = "devopsproject/prod/main"
       image_tag_mutability = "MUTABLE"
     }
   ]
@@ -380,5 +380,72 @@ variable "ecr_repositories" {
 
 variable "domain" {
   type    = string
-  default = "devopsnanuvemweek.com"
+  default = "ecommerce.devopsproject.com.br"
+}
+
+# ADR-0007 — t3.small worker ASG for cluster-autoscaler priority-expander
+# The CA priority-expander prefers this ASG (higher priority number in ConfigMap).
+# Starts at desired=0; CA provisions nodes on-demand from this pool.
+variable "worker_t3_small_launch_template" {
+  description = "Launch template settings for t3.small worker nodes (ADR-0007 priority-expander)"
+  type = object({
+    name                                 = string
+    disable_api_stop                     = bool
+    disable_api_termination              = bool
+    instance_type                        = string
+    instance_initiated_shutdown_behavior = string
+    user_data                            = string
+    ebs = object({
+      size                  = number
+      delete_on_termination = bool
+    })
+  })
+
+  default = {
+    name                                 = "devopsproject-production-debian-worker-t3-small-lt"
+    disable_api_stop                     = true
+    disable_api_termination              = true
+    instance_type                        = "t3.small"
+    instance_initiated_shutdown_behavior = "terminate"
+    user_data                            = "./cli/worker-user-data.sh"
+    ebs = {
+      size                  = 20
+      delete_on_termination = true
+    }
+  }
+}
+
+variable "worker_t3_small_auto_scaling_group" {
+  description = "ASG settings for t3.small worker nodes managed by cluster-autoscaler (ADR-0007)"
+  type = object({
+    name                      = string
+    max_size                  = number
+    min_size                  = number
+    desired_capacity          = number
+    health_check_grace_period = number
+    health_check_type         = string
+    instance_tags = object({
+      Name = string
+    })
+    instance_maintenance_policy = object({
+      min_healthy_percentage = number
+      max_healthy_percentage = number
+    })
+  })
+
+  default = {
+    name                      = "devopsproject-production-worker-t3-small-asg"
+    max_size                  = 3
+    min_size                  = 0
+    desired_capacity          = 0
+    health_check_grace_period = 180
+    health_check_type         = "EC2"
+    instance_tags = {
+      Name = "devopsproject-production-worker-t3-small"
+    }
+    instance_maintenance_policy = {
+      min_healthy_percentage = 100
+      max_healthy_percentage = 110
+    }
+  }
 }

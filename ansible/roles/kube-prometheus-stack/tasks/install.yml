@@ -1,0 +1,53 @@
+---
+# kube-prometheus-stack v87.2.1 — prometheus-community/helm-charts (2026-06-24, latest)
+# ADR-0007: Prometheus + Grafana + Alertmanager + node-exporter + kube-state-metrics
+# Namespace: monitoring
+# Scrapes KEDA metrics (keda_scaler_metrics_value) via additionalScrapeConfigs.
+# Grafana dashboard "Event-Driven Autoscaling" provisioned via ConfigMap.
+# Fluent Bit -> OpenSearch for logs is NOT changed (ADR decision).
+
+- name: Adding Prometheus Community Helm Repository
+  shell: |
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+
+- name: Uploading kube-prometheus-stack Values
+  # Uses 'template' instead of 'copy' so Ansible resolves {{ grafana_admin_password }}
+  # (sourced from group_vars/all.yml -> vault_grafana_admin_password) before sending the file.
+  template:
+    src: kube-prometheus-stack-values.yaml
+    dest: /tmp/kube-prometheus-stack-values.yaml
+
+- name: Uploading Grafana Dashboard ConfigMap
+  copy:
+    src: grafana-dashboard-event-driven-autoscaling.yaml
+    dest: /tmp/grafana-dashboard-event-driven-autoscaling.yaml
+
+- name: Installing kube-prometheus-stack
+  shell: |
+    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+      --namespace monitoring \
+      --version 87.2.1 \
+      --values /tmp/kube-prometheus-stack-values.yaml \
+      --wait \
+      --timeout 10m
+
+- name: Applying Grafana Dashboard ConfigMap
+  shell: kubectl apply -f /tmp/grafana-dashboard-event-driven-autoscaling.yaml
+
+- name: Uploading PrometheusRule for Event-Driven Autoscaling alerts
+  copy:
+    src: prometheus-rule-event-driven-autoscaling.yaml
+    dest: /tmp/prometheus-rule-event-driven-autoscaling.yaml
+
+- name: Applying PrometheusRule for Event-Driven Autoscaling alerts
+  shell: kubectl apply -f /tmp/prometheus-rule-event-driven-autoscaling.yaml
+
+- name: Verifying kube-prometheus-stack Pods
+  shell: kubectl get pods -n monitoring
+  register: monitoring_pods
+
+- name: Displaying Monitoring Pods Status
+  debug:
+    var: monitoring_pods.stdout_lines

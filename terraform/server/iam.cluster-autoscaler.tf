@@ -1,32 +1,37 @@
 data "aws_iam_policy_document" "cluster_autoscaler" {
-    statement {
-        effect = "Allow"
-        resources = ["*"]
-        actions = [
-            "autoscaling:DescribeAutoScalingGroups",
-            "autoscaling:DescribeAutoScalingInstances",
-            "autoscaling:DescribeLaunchConfigurations",
-            "autoscaling:DescribeScalingActivities",
-            "ec2:DescribeImages",
-            "ec2:DescribeInstanceTypes",
-            "ec2:DescribeLaunchTemplateVersions",
-            "ec2:GetInstanceTypesFromInstanceRequirements"
-        ]
-    }
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions = [
+      "autoscaling:DescribeAutoScalingGroups",
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
+      "ec2:DescribeImages",
+      "ec2:DescribeInstanceTypes",
+      "ec2:DescribeLaunchTemplateVersions",
+      "ec2:GetInstanceTypesFromInstanceRequirements"
+    ]
+  }
 
-    statement {
-        effect = "Allow"
-        resources = [module.ec2_workers_instances.auto_scaling_group_arn]
-        actions = [
-            "autoscaling:SetDesiredCapacity",
-            "autoscaling:TerminateInstanceInAutoScalingGroup"
-        ]
+  # ADR-0007: extended to include the new t3.small worker ASG (priority-expander).
+  # Both ASGs carry the k8s.io/cluster-autoscaler/* auto-discovery tags.
+  statement {
+    effect = "Allow"
+    resources = [
+      module.ec2_workers_instances.auto_scaling_group_arn,
+      module.ec2_workers_t3_small_instances.auto_scaling_group_arn,
+    ]
+    actions = [
+      "autoscaling:SetDesiredCapacity",
+      "autoscaling:TerminateInstanceInAutoScalingGroup"
+    ]
   }
 }
 
 resource "aws_iam_policy" "cluster_autoscaler" {
-  name        = var.worker_auto_scaling_group.cluster_auto_scaler_policy_name
-  policy        = data.aws_iam_policy_document.cluster_autoscaler.json
+  name   = var.worker_auto_scaling_group.cluster_auto_scaler_policy_name
+  policy = data.aws_iam_policy_document.cluster_autoscaler.json
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_autoscaler" {

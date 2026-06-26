@@ -1,0 +1,36 @@
+---
+# KEDA v2.15.1 — Kubernetes 1.28-1.30 compatibility confirmed at keda.sh/docs/2.15/operate/cluster/
+# v2.14.x only covers 1.27-1.29; v2.15.x is the correct line for this cluster (k8s 1.30).
+# ADR-0007 — identityOwner: operator reuses the node instance role (AmazonSQSFullAccess).
+# No TriggerAuthentication needed in Phase 1 (same-account, instance role already authorised).
+
+- name: Adding KEDA Helm Repository
+  shell: |
+    helm repo add kedacore https://kedacore.github.io/charts
+    helm repo update
+
+- name: Installing KEDA Operator
+  shell: |
+    kubectl create namespace keda --dry-run=client -o yaml | kubectl apply -f -
+    helm upgrade --install keda kedacore/keda \
+      --namespace keda \
+      --version 2.15.1 \
+      --set watchNamespace="" \
+      --set resources.operator.requests.cpu=100m \
+      --set resources.operator.requests.memory=100Mi \
+      --set resources.operator.limits.cpu=500m \
+      --set resources.operator.limits.memory=200Mi \
+      --set resources.metricServer.requests.cpu=100m \
+      --set resources.metricServer.requests.memory=100Mi \
+      --set resources.metricServer.limits.cpu=500m \
+      --set resources.metricServer.limits.memory=200Mi \
+      --wait \
+      --timeout 5m
+
+- name: Verifying KEDA Operator Pods
+  shell: kubectl get pods -n keda
+  register: keda_pods
+
+- name: Displaying KEDA Pods Status
+  debug:
+    var: keda_pods.stdout_lines

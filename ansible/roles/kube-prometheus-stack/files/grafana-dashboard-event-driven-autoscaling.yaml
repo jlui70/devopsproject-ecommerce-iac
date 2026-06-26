@@ -1,0 +1,321 @@
+---
+# ADR-0007 — Grafana Dashboard "Event-Driven Autoscaling"
+# Panels: fila x replicas x nodes x idade de mensagem x DLQ
+# Versioned in Git (GitOps). Applied by kube-prometheus-stack Ansible role.
+# The label grafana_dashboard: "1" is picked up by the Grafana sidecar provisioner.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-event-driven-autoscaling
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/managed-by: ansible
+    app.kubernetes.io/part-of: devopsproject
+    adr: ADR-0007
+data:
+  event-driven-autoscaling.json: |
+    {
+      "__inputs": [],
+      "__requires": [
+        { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+        { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+      ],
+      "annotations": { "list": [] },
+      "description": "Event-Driven Autoscaling — fila x replicas x nodes x idade de mensagem x DLQ (ADR-0007)",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "id": 1,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "keda_scaler_metrics_value{scaledObject=~\"notificator|invoice-generator\"}",
+              "legendFormat": "{{scaledObject}} — fila (msgs)",
+              "refId": "A"
+            }
+          ],
+          "title": "Profundidade da Fila SQS (keda_scaler_metrics_value)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "id": 2,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas_ready{deployment=~\"notificator|invoice-generator\",namespace=\"production\"}",
+              "legendFormat": "{{deployment}} — replicas ready",
+              "refId": "A"
+            },
+            {
+              "expr": "kube_deployment_spec_replicas{deployment=~\"notificator|invoice-generator\",namespace=\"production\"}",
+              "legendFormat": "{{deployment}} — replicas desired",
+              "refId": "B"
+            }
+          ],
+          "title": "Replicas por Deployment (notificator / invoice-generator)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "id": 3,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "count(kube_node_status_condition{condition=\"Ready\",status=\"true\"})",
+              "legendFormat": "Nodes Ready",
+              "refId": "A"
+            },
+            {
+              "expr": "count(kube_node_spec_unschedulable == 0)",
+              "legendFormat": "Nodes Schedulable",
+              "refId": "B"
+            }
+          ],
+          "title": "Nodes no Cluster",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "id": 4,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "aws_sqs_approximate_age_of_oldest_message_maximum{queue_name=~\"EmailNotificationQueue|InvoiceQueue\"}",
+              "legendFormat": "{{queue_name}} — idade da msg mais antiga (s)",
+              "refId": "A"
+            }
+          ],
+          "title": "Idade da Mensagem Mais Antiga (ApproximateAgeOfOldestMessage) — requer yace/CloudWatch exporter",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "id": 5,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "aws_sqs_approximate_number_of_messages_visible_maximum{queue_name=~\"EmailNotificationQueue-dlq|InvoiceQueue-dlq\"}",
+              "legendFormat": "{{queue_name}} — msgs na DLQ",
+              "refId": "A"
+            }
+          ],
+          "title": "Profundidade da DLQ — requer yace/CloudWatch exporter",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "id": 6,
+          "options": { "legend": { "calcs": ["last"], "displayMode": "list" }, "tooltip": { "mode": "multi" } },
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"production\",container=~\"notificator|invoice-generator\"}[5m])",
+              "legendFormat": "{{container}} — CPU usage",
+              "refId": "A"
+            }
+          ],
+          "title": "CPU Usage — notificator / invoice-generator (trigger secundario)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
+          "id": 7,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+          "targets": [
+            {
+              "expr": "kube_deployment_spec_replicas{deployment=\"notificator\",namespace=\"production\"} == kube_deployment_spec_replicas{deployment=\"notificator\",namespace=\"production\"}",
+              "legendFormat": "notificator replicas",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "notificator — Replicas Atual",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 24 },
+          "id": 8,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+          "targets": [
+            {
+              "expr": "kube_deployment_spec_replicas{deployment=\"invoice-generator\",namespace=\"production\"}",
+              "legendFormat": "invoice-generator replicas",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "invoice-generator — Replicas Atual",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 50 },
+                  { "color": "red", "value": 100 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
+          "id": 9,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+          "targets": [
+            {
+              "expr": "keda_scaler_metrics_value{scaledObject=\"notificator\"}",
+              "legendFormat": "EmailNotificationQueue msgs",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "EmailNotificationQueue — Msgs na Fila",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 50 },
+                  { "color": "red", "value": 100 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+          "id": 10,
+          "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+          "targets": [
+            {
+              "expr": "keda_scaler_metrics_value{scaledObject=\"invoice-generator\"}",
+              "legendFormat": "InvoiceQueue msgs",
+              "refId": "A",
+              "instant": true
+            }
+          ],
+          "title": "InvoiceQueue — Msgs na Fila",
+          "type": "stat"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 38,
+      "tags": ["keda", "autoscaling", "sqs", "adr-0007"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Event-Driven Autoscaling",
+      "uid": "event-driven-autoscaling-adr0007",
+      "version": 1
+    }

@@ -1,0 +1,104 @@
+# kube-prometheus-stack values — ADR-0007
+# Chart version: 87.2.1 (prometheus-community/kube-prometheus-stack, 2026-06-24)
+# Cluster: kubeadm v1.30 (self-managed, Debian 12, t3.micro workers)
+# Template: Ansible resolves {{ grafana_admin_password }} from group_vars/all.yml
+#           (backed by vault_grafana_admin_password via Ansible Vault).
+
+grafana:
+  enabled: true
+  # Senha injetada via Ansible Vault — nunca em plaintext em arquivos versionados.
+  # Valor real definido em group_vars/all.yml como:
+  #   grafana_admin_password: "{{ vault_grafana_admin_password }}"
+  # e cifrado com: ansible-vault encrypt_string '<senha>' --name vault_grafana_admin_password
+  adminPassword: "{{ grafana_admin_password }}"
+  service:
+    type: NodePort
+    nodePort: 32000
+  persistence:
+    enabled: false   # stateless for this workshop cluster; enable with EBS CSI for long-term
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+    auth:
+      disable_login_form: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 15d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    # Allow Prometheus to scrape ServiceMonitors from all namespaces (KEDA lives in 'keda')
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    # Scrape KEDA operator and metrics-apiserver directly.
+    # KEDA v2.15 exposes Prometheus metrics on port 8080 (operator) and 9022 (metrics-adapter).
+    # keda_scaler_metrics_value is the key metric for fila x replicas dashboarding.
+    additionalScrapeConfigs:
+      - job_name: keda-operator
+        scrape_interval: 30s
+        static_configs:
+          - targets:
+              - keda-operator.keda.svc.cluster.local:8080
+        relabel_configs:
+          - target_label: job
+            replacement: keda-operator
+
+      - job_name: keda-metrics-apiserver
+        scrape_interval: 30s
+        static_configs:
+          - targets:
+              - keda-operator-metrics-apiserver.keda.svc.cluster.local:9022
+        relabel_configs:
+          - target_label: job
+            replacement: keda-metrics-apiserver
+
+      # Optional: yace/CloudWatch exporter for ApproximateAgeOfOldestMessage and DLQ depth.
+      # Uncomment when the yace Deployment is applied (see ADR-0007 optional deliverable).
+      # - job_name: yace-cloudwatch-exporter
+      #   scrape_interval: 60s
+      #   static_configs:
+      #     - targets:
+      #         - yace-cloudwatch-exporter.monitoring.svc.cluster.local:5000
+
+nodeExporter:
+  enabled: true
+
+kube-state-metrics:
+  enabled: true
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

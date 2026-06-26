@@ -1,10 +1,14 @@
 ansible_connection: aws_ssm
-ansible_aws_ssm_bucket_name: not-so-simple-ecommerce-ansible-ssm
-terraform_path: <YOUR_REPOSITORY_PATH>/not-so-simple-ecommerce-iac/terraform
+ansible_aws_ssm_bucket_name: devopsproject-ecommerce-ansible-ssm
+terraform_path: /home/luiz7/Projects/devops-na-nuvem/devopsproject-ecommerce-iac/terraform
 aws_region: us-east-1
-aws_access_key: <YOUR_ACCESS_KEY>
-aws_secret_access_key: <YOUR_SECRET_ACCESS_KEY>
-aws_profile: <YOUR_AWS_PROFILE>
+aws_access_key: <USE_ANSIBLE_VAULT>
+aws_secret_access_key: <USE_ANSIBLE_VAULT>
+aws_profile: devopsproject
 kube_config: /etc/kubernetes/admin.conf
 kube_config_worker: /etc/kubernetes/kubelet.conf
 opensearch_master_password: DevOpsNaNuvem@2025
+# Senha do Grafana — valor real deve ser cifrado com Ansible Vault antes do apply.
+# Para gerar: ansible-vault encrypt_string '<senha-segura>' --name vault_grafana_admin_password
+# Adicionar o resultado cifrado neste arquivo e remover o placeholder abaixo.
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
