@@ -1,10 +1,10 @@
 resource "aws_nat_gateway" "this" {
-  count = length(aws_subnet.public)
+  for_each = toset(var.vpc.availability_zones)
 
-  allocation_id = aws_eip.this[count.index].id
-  subnet_id     = aws_subnet.public[count.index].id
+  allocation_id = aws_eip.nat[each.key].id
+  subnet_id     = aws_subnet.public[each.key].id
 
-  tags = { Name = "${var.vpc.name}-${var.vpc.nat_gateway_name}-${aws_subnet.public[count.index].availability_zone}" }
+  tags = { Name = "${var.vpc.name}-nat-${each.key}" }
 
   depends_on = [aws_internet_gateway.this]
 }

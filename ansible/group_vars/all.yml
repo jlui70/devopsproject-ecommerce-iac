@@ -1,14 +1,17 @@
+---
+kubernetes_version: "1.30"
+cluster_name: "ecommerce-devopsproject-cluster"
+pod_subnet: "10.244.0.0/16"
+cgroup_driver: "systemd"
+crio_socket: "unix:///var/run/crio/crio.sock"
+cloud_provider: "external"
+kubeconfig_path: "/etc/kubernetes/admin.conf"
+terraform_state_bucket: "devopsproject-terraform-state-692430448478"
+terraform_state_key: "server/terraform.tfstate"
+terraform_state_region: "us-east-1"
 ansible_connection: aws_ssm
-ansible_aws_ssm_bucket_name: devopsproject-ecommerce-ansible-ssm
-terraform_path: /home/luiz7/Projects/devops-na-nuvem/devopsproject-ecommerce-iac/terraform
-aws_region: us-east-1
-aws_access_key: <USE_ANSIBLE_VAULT>
-aws_secret_access_key: <USE_ANSIBLE_VAULT>
-aws_profile: devopsproject
-kube_config: /etc/kubernetes/admin.conf
-kube_config_worker: /etc/kubernetes/kubelet.conf
-opensearch_master_password: DevOpsNaNuvem@2025
-# Senha do Grafana — valor real deve ser cifrado com Ansible Vault antes do apply.
-# Para gerar: ansible-vault encrypt_string '<senha-segura>' --name vault_grafana_admin_password
-# Adicionar o resultado cifrado neste arquivo e remover o placeholder abaixo.
-grafana_admin_password: "{{ vault_grafana_admin_password }}"
+ansible_aws_ssm_bucket_name: "devopsproject-ecommerce-ansible-ssm"
+ansible_aws_ssm_region: "us-east-1"
+ansible_aws_ssm_timeout: 900
+antrea_version: "v2.1.1"
+external_dns_chart_version: "8.3.4"

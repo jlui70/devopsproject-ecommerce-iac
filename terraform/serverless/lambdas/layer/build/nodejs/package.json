@@ -1,0 +1,9 @@
+{
+  "name": "devopsproject-lambda-layer",
+  "version": "1.0.0",
+  "description": "Shared dependencies for devopsproject Lambda functions",
+  "dependencies": {
+    "mongodb": "^6.3.0",
+    "pg": "^8.11.3"
+  }
+}

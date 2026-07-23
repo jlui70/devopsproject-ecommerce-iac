@@ -1,3 +1,6 @@
-- include_tasks: install-node-termination.yml
+---
+- name: Retrieve node_termination_queue_url from Terraform state
+  ansible.builtin.include_tasks: terraform-output.yml
 
-
+- name: Install AWS Node Termination Handler
+  ansible.builtin.include_tasks: install-node-termination.yml

@@ -1,0 +1,49 @@
+---
+- name: Add Fluent Bit Helm repository
+  ansible.builtin.command:
+    cmd: "helm repo add fluent https://fluent.github.io/helm-charts"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "helm repo update"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Create logging namespace
+  ansible.builtin.shell:
+    cmd: "kubectl create namespace logging --dry-run=client -o yaml | kubectl apply -f -"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Render Fluent Bit values file
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: /tmp/fluent-bit-values.yaml
+    mode: "0600"
+
+- name: Install or upgrade Fluent Bit via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install fluent-bit fluent/fluent-bit
+      --namespace logging
+      --values /tmp/fluent-bit-values.yaml
+      --timeout 300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Fluent Bit DaemonSet rollout
+  ansible.builtin.command:
+    cmd: >
+      kubectl rollout status daemonset/fluent-bit
+      --namespace logging
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

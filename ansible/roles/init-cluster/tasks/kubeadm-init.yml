@@ -1,8 +1,48 @@
 ---
-- name: KubeAdm Init
-  shell: kubeadm init --config /home/admin/kubeadm-init.yml
-  register: kubeadm_init_output
+- name: Check if cluster is already initialized
+  ansible.builtin.stat:
+    path: "{{ kubeconfig_path }}"
+  register: kubeconfig_stat
 
-- name: KubeAdm Init (Output)
-  debug:
-    var: kubeadm_init_output.stdout_lines
+- name: Reset kubeadm state before initializing (idempotent — safe to run even on clean node)
+  ansible.builtin.command:
+    cmd: kubeadm reset --force
+  when: not kubeconfig_stat.stat.exists
+  changed_when: true
+
+- name: Stop kubelet and wait for API server port to be free
+  ansible.builtin.systemd:
+    name: kubelet
+    state: stopped
+  when: not kubeconfig_stat.stat.exists
+
+- name: Wait for port 6443 to be released
+  ansible.builtin.wait_for:
+    port: 6443
+    state: stopped
+    timeout: 60
+  when: not kubeconfig_stat.stat.exists
+
+- name: Initialize Kubernetes cluster with kubeadm
+  ansible.builtin.command:
+    cmd: "kubeadm init --config /tmp/kubeadm-init.yml --upload-certs"
+  when: not kubeconfig_stat.stat.exists
+  register: kubeadm_init_result
+  changed_when: true
+
+- name: Create .kube directory for root user
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Copy admin kubeconfig to root user home directory
+  ansible.builtin.copy:
+    src: "{{ kubeconfig_path }}"
+    dest: /root/.kube/config
+    owner: root
+    group: root
+    mode: "0600"
+    remote_src: true

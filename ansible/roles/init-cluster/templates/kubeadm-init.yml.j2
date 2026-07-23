@@ -1,0 +1,33 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{ ansible_default_ipv4.address }}"
+  bindPort: 6443
+nodeRegistration:
+  criSocket: "{{ crio_socket }}"
+  name: "{{ cp_aws_hostname.stdout }}"
+  kubeletExtraArgs:
+    cloud-provider: "{{ cloud_provider }}"
+    provider-id: "aws:///{{ cp_aws_az.stdout }}/{{ cp_aws_instance_id.stdout }}"
+    hostname-override: "{{ cp_aws_hostname.stdout }}"
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: "{{ kubelet_semver }}"
+clusterName: "{{ cluster_name }}"
+controlPlaneEndpoint: "{{ nlb_dns_name }}:6443"
+networking:
+  podSubnet: "{{ pod_subnet }}"
+apiServer:
+  extraArgs:
+    cloud-provider: "{{ cloud_provider }}"
+  certSANs:
+    - "127.0.0.1"
+    - "{{ nlb_dns_name }}"
+controllerManager:
+  extraArgs:
+    cloud-provider: "{{ cloud_provider }}"
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: "{{ cgroup_driver }}"

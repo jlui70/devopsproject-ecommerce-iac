@@ -1,9 +1,9 @@
 ---
-- name: Install Kubectl, Kubeadm e Kubelet
-  apt:
+- name: Install kubelet, kubeadm, kubectl and cri-tools
+  ansible.builtin.apt:
     name:
-    - kubectl
-    - kubeadm
-    - kubelet
+      - "kubelet={{ kubernetes_version }}.*"
+      - "kubeadm={{ kubernetes_version }}.*"
+      - "kubectl={{ kubernetes_version }}.*"
+      - cri-tools
     state: present
-    update_cache: true

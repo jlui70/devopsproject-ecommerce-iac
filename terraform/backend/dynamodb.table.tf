@@ -1,10 +1,10 @@
 resource "aws_dynamodb_table" "this" {
-  name         = var.remote_backend.state_locking.dynamodb_table_name
-  billing_mode = var.remote_backend.state_locking.dynamodb_table_billing_mode
-  hash_key     = var.remote_backend.state_locking.dynamodb_table_hash_key
+  name         = var.state_backend.table_name
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
 
   attribute {
-    name =var.remote_backend.state_locking.dynamodb_table_hash_key
-    type = var.remote_backend.state_locking.dynamodb_table_hash_key_type
+    name = "LockID"
+    type = "S"
   }
 }

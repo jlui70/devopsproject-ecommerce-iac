@@ -1,4 +1,9 @@
 ---
-- include_tasks: repository.yml
-- include_tasks: install.yml
-- include_tasks: network-configuration.yml
+- name: Configure kernel modules and sysctl for container networking
+  ansible.builtin.include_tasks: network-configuration.yml
+
+- name: Add CRI-O apt repository
+  ansible.builtin.include_tasks: repository.yml
+
+- name: Install CRI-O runtime
+  ansible.builtin.include_tasks: install.yml

@@ -1,8 +1,33 @@
-- name: Installing AWS CCM
-  shell: |
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/master/examples/existing-cluster/base/apiserver-authentication-reader-role-binding.yaml \
-      -f https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/master/examples/existing-cluster/base/cluster-role-binding.yaml \
-      -f https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/master/examples/existing-cluster/base/cluster-role.yaml \
-      -f https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/master/examples/existing-cluster/base/service-account.yaml \
-      -f https://raw.githubusercontent.com/kubernetes/cloud-provider-aws/master/examples/existing-cluster/base/aws-cloud-controller-manager-daemonset.yaml
+---
+- name: Apply AWS Cloud Controller Manager manifests
+  ansible.builtin.command:
+    cmd: "kubectl apply -k 'github.com/kubernetes/cloud-provider-aws/examples/existing-cluster/base/?ref=master'"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
 
+- name: Wait for AWS Cloud Controller Manager to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace kube-system
+      --selector=k8s-app=aws-cloud-controller-manager
+      --for=condition=Ready
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
+- name: Wait for all Antrea agent pods to stabilize after CCM initializes nodes
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace kube-system
+      --selector=app=antrea,component=antrea-agent
+      --for=condition=Ready
+      --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

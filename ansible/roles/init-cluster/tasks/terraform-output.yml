@@ -1,11 +1,25 @@
 ---
-- name: Terraform Output
-  shell: terraform output -json > /tmp/terraform-server-outputs.json
-  args:
-    chdir: "{{terraform_path}}/server"
-  delegate_to: localhost
-  become: false
-  environment:
-    AWS_REGION: "{{aws_region}}"
-    AWS_ACCESS_KEY: "{{aws_access_key}}"
-    AWS_SECRET_ACCESS_KEY: "{{aws_secret_access_key}}"
+- name: Download Terraform state file from S3
+  ansible.builtin.command:
+    cmd: "aws s3 cp s3://{{ terraform_state_bucket }}/{{ terraform_state_key }} /tmp/terraform-server.tfstate"
+  changed_when: true
+
+- name: Read nlb_dns_name from Terraform state
+  ansible.builtin.shell:
+    cmd: "python3 -c \"import json; s=json.load(open('/tmp/terraform-server.tfstate')); print(s['outputs']['nlb_dns_name']['value'])\""
+  register: nlb_dns_name_output
+  changed_when: false
+
+- name: Read node_termination_queue_url from Terraform state
+  ansible.builtin.shell:
+    cmd: "python3 -c \"import json; s=json.load(open('/tmp/terraform-server.tfstate')); print(s['outputs']['node_termination_queue_url']['value'])\""
+  register: node_termination_queue_url_output
+  changed_when: false
+
+- name: Set nlb_dns_name and node_termination_queue_url as global facts
+  ansible.builtin.set_fact:
+    nlb_dns_name: "{{ nlb_dns_name_output.stdout | trim }}"
+    node_termination_queue_url: "{{ node_termination_queue_url_output.stdout | trim }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: "{{ groups['all'] }}"

@@ -1,0 +1,2 @@
+- [Ansible Bootstrap Layer (ADR-0002)](project_ansible_layer.md) — Structure, SSM prerequisites, key decisions, Cluster Autoscaler v1.30.0, hostnames role not in site.yml
+- [Terraform Server Stack (ADR-0002)](project_terraform_server_stack.md) — Key outputs (nlb_dns_name, node_termination_queue_url, acm_certificate_arn, SG IDs, ECR URLs)

@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "this" {
-  bucket = var.remote_backend.bucket
+  bucket = var.state_backend.bucket_name
 }
 
 resource "aws_s3_bucket_versioning" "this" {

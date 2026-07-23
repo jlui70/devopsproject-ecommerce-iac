@@ -1,10 +1,31 @@
 ---
-- name: Adding Signing Key for CRI-O
-  apt_key:
-    url: https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/Release.key
-    keyring: /etc/apt/keyrings/cri-o-apt-keyring.gpg
-    
-- name: Add CRI-O Repository
-  apt_repository:
-    repo: deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/prerelease:/main/deb/ /
-    state: present
+- name: Create keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download CRI-O GPG key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/addons:/cri-o:/stable:/v{{ kubernetes_version }}/deb/Release.key"
+    dest: /tmp/crio-release.key
+    mode: "0644"
+
+- name: Dearmor and install CRI-O GPG key
+  ansible.builtin.shell:
+    cmd: "gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg /tmp/crio-release.key"
+    creates: /etc/apt/keyrings/cri-o-apt-keyring.gpg
+
+- name: Add CRI-O apt repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/cri-o.list
+    content: "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/v{{ kubernetes_version }}/deb/ /\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Update apt cache after adding CRI-O repository
+  ansible.builtin.apt:
+    update_cache: true

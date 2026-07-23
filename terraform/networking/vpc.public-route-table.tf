@@ -6,12 +6,12 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.this.id
   }
 
-  tags = { Name = "${var.vpc.name}-${var.vpc.public_route_table_name}" }
+  tags = { Name = "${var.vpc.name}-public-rt" }
 }
 
 resource "aws_route_table_association" "public" {
-  count = length(aws_subnet.public)
+  for_each = aws_subnet.public
 
-  subnet_id      = aws_subnet.public[count.index].id
+  subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }

@@ -1,18 +1,39 @@
-- name: Authenticate Public ECR
-  shell: |
-    aws ecr-public get-login-password \
-     --region {{aws_region}} | helm registry login \
-     --username AWS \
-     --password-stdin public.ecr.aws
+---
+- name: Add EKS Helm chart repository (idempotent)
+  ansible.builtin.command:
+    cmd: "helm repo add eks https://aws.github.io/eks-charts"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
 
-- name: Instaling AWS Node Termination Handler
-  vars:
-    terraform_outputs: "{{ lookup('file', '{{terraform_path}}/server/outputs.json') }}"
-    node_termination_queue_url: "{{ terraform_outputs.node_termination_queue_url.value }}"
-  shell: |
-    kubectl rollout restart deploy/coredns -n kube-system
-    helm upgrade --install aws-node-termination-handler \
-      --namespace kube-system \
-      --set enableSqsTerminationDraining=true \
-      --set queueURL={{node_termination_queue_url}} \
-      oci://public.ecr.aws/aws-ec2/helm/aws-node-termination-handler
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "helm repo update"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Install or upgrade AWS Node Termination Handler via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install aws-node-termination-handler eks/aws-node-termination-handler
+      --namespace kube-system
+      --set enableSqsTerminationDraining=true
+      --set queueURL={{ node_termination_queue_url }}
+      --set awsRegion=us-east-1
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Node Termination Handler pods to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace kube-system
+      --selector=app.kubernetes.io/name=aws-node-termination-handler
+      --for=condition=Ready
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

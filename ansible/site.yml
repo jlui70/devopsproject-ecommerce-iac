@@ -1,69 +1,108 @@
 ---
-- name: Setting Up Cluster
-  hosts: aws_ec2
+- name: Install dependency packages on all nodes
+  hosts: control_plane:workers
   become: true
   roles:
-    - hostnames
     - dependency-packages
-    - kube-packages
+
+- name: Install and configure CRI-O container runtime
+  hosts: control_plane:workers
+  become: true
+  roles:
     - container-runtime
 
-- name: Init Cluster
-  hosts: control_planes[0]
+- name: Install Kubernetes packages
+  hosts: control_plane:workers
   become: true
-  environment:
-    KUBECONFIG: "{{kube_config}}"
+  roles:
+    - kube-packages
+
+- name: Initialize Kubernetes cluster (first control plane)
+  hosts: control_plane[0]
+  become: true
   roles:
     - init-cluster
-    - set-provider-id
+
+- name: Install Antrea CNI
+  hosts: control_plane[0]
+  become: true
+  roles:
     - container-network
 
-- name: Join Control Planes
-  hosts: control_planes:!control_planes[0]
+- name: Install Helm
+  hosts: control_plane[0]
   become: true
-  environment:
-    KUBECONFIG: "{{kube_config}}"
-  roles:
-    - join-control-planes
-    - set-provider-id
-
-- name: Join Workers
-  hosts: workers
-  become: true
-  environment:
-    KUBECONFIG: "{{kube_config_worker}}"
-  roles:
-    - join-workers
-    - set-provider-id
-
-- name: Update Launch Template
-  hosts: localhost
-  roles:
-    - update-launch-template
-
-- name: Setting Up Cluster Components
-  hosts: control_planes[0]
-  become: true
-  environment:
-    KUBECONFIG: "{{kube_config}}"
   roles:
     - helm
-    - cloud-controller
-    - node-termination
-    - cluster-autoscaler
-    - argocd
-    - metrics-server
-    - external-dns
-    - load-balancer-controller
-    - container-storage
-    - keda
 
-- name: Setting Up Observability
-  hosts: control_planes[0]
+- name: Install EBS CSI storage driver
+  hosts: control_plane[0]
   become: true
-  environment:
-    KUBECONFIG: "{{kube_config}}"
+  roles:
+    - container-storage
+
+- name: Join worker nodes to cluster
+  hosts: workers
+  become: true
+  roles:
+    - join-workers
+
+- name: Join additional control plane nodes
+  hosts: control_plane[1:]
+  become: true
+  roles:
+    - join-control-planes
+
+- name: Install AWS Cloud Controller Manager
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - cloud-controller
+
+- name: Install AWS Load Balancer Controller
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - load-balancer-controller
+
+- name: Install External DNS
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - external-dns
+
+- name: Install Cluster Autoscaler
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - cluster-autoscaler
+
+- name: Install Metrics Server
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - metrics-server
+
+- name: Install Node Termination Handler
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - node-termination
+
+- name: Install External Secrets Operator
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - external-secrets-operator
+
+- name: Install Fluent Bit log shipper
+  hosts: control_plane[0]
+  become: true
   roles:
     - fluent-bit
+
+- name: Install Metricbeat metrics shipper
+  hosts: control_plane[0]
+  become: true
+  roles:
     - metricbeat
-    - kube-prometheus-stack

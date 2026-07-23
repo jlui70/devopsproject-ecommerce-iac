@@ -1,5 +1,77 @@
 ---
-- name: Join Control Planes
-  vars:
-    join_control_plane: "{{ lookup('file', '/tmp/kubeadm-join-control-plane.txt') }}"
-  shell: "export KUBELET_EXTRA_ARGS=\"--cloud-provider=external\" && {{ join_control_plane }}"
+- name: Check if node is already a control plane member
+  ansible.builtin.stat:
+    path: "{{ kubeconfig_path }}"
+  register: kubeconfig_stat
+
+- name: Get IMDSv2 token
+  ansible.builtin.command:
+    cmd: "curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'"
+  register: imds_token
+  changed_when: false
+
+- name: Get AWS availability zone
+  ansible.builtin.command:
+    cmd: "curl -s -H 'X-aws-ec2-metadata-token: {{ imds_token.stdout }}' http://169.254.169.254/latest/meta-data/placement/availability-zone"
+  register: aws_az
+  changed_when: false
+
+- name: Get AWS instance ID
+  ansible.builtin.command:
+    cmd: "curl -s -H 'X-aws-ec2-metadata-token: {{ imds_token.stdout }}' http://169.254.169.254/latest/meta-data/instance-id"
+  register: aws_instance_id
+  changed_when: false
+
+- name: Get AWS private DNS hostname
+  ansible.builtin.command:
+    cmd: "curl -s -H 'X-aws-ec2-metadata-token: {{ imds_token.stdout }}' http://169.254.169.254/latest/meta-data/local-hostname"
+  register: aws_hostname
+  changed_when: false
+
+- name: Configure kubelet with cloud-provider, provider-id and hostname-override
+  ansible.builtin.lineinfile:
+    path: /etc/default/kubelet
+    regexp: "^KUBELET_EXTRA_ARGS="
+    line: 'KUBELET_EXTRA_ARGS=--cloud-provider=external --provider-id=aws:///{{ aws_az.stdout }}/{{ aws_instance_id.stdout }} --hostname-override={{ aws_hostname.stdout }}'
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  when: not kubeconfig_stat.stat.exists
+
+- name: Reload systemd and restart kubelet after config change
+  ansible.builtin.systemd:
+    name: kubelet
+    state: restarted
+    daemon_reload: true
+  when: not kubeconfig_stat.stat.exists
+
+- name: Join additional control plane node to cluster
+  ansible.builtin.command:
+    cmd: "{{ hostvars[groups['control_plane'][0]]['control_plane_join_command'] }} --control-plane --node-name={{ aws_hostname.stdout }}"
+  when: not kubeconfig_stat.stat.exists
+  changed_when: true
+
+- name: Wait for Antrea CNI config to be written on this control plane
+  ansible.builtin.wait_for:
+    path: /etc/cni/net.d/10-antrea.conflist
+    state: present
+    timeout: 300
+
+- name: Create .kube directory for root user
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Copy admin kubeconfig to root user home directory
+  ansible.builtin.copy:
+    src: "{{ kubeconfig_path }}"
+    dest: /root/.kube/config
+    owner: root
+    group: root
+    mode: "0600"
+    remote_src: true
+  when: not kubeconfig_stat.stat.exists

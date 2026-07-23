@@ -1,3 +1,81 @@
 ---
-- name: Installing Antrea CNI
-  shell: kubectl apply -f https://raw.githubusercontent.com/antrea-io/antrea/main/build/yamls/antrea.yml
+# Remove taints that block CNI controller scheduling before the Cloud Controller
+# Manager and CNI are both running (classic chicken-and-egg on fresh cluster).
+# These taints are re-managed by their respective controllers after CNI is up.
+- name: Remove cloud-provider uninitialized taint to allow CNI scheduling
+  ansible.builtin.command:
+    cmd: >
+      kubectl taint nodes --all
+      node.cloudprovider.kubernetes.io/uninitialized:NoSchedule-
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: taint_uninitialized
+  changed_when: "'untainted' in taint_uninitialized.stdout"
+  failed_when: false
+
+- name: Remove not-ready NoSchedule taint to allow CNI controller scheduling
+  ansible.builtin.command:
+    cmd: >
+      kubectl taint nodes --all
+      node.kubernetes.io/not-ready:NoSchedule-
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: taint_notready
+  changed_when: "'untainted' in taint_notready.stdout"
+  failed_when: false
+
+- name: Apply Antrea CNI manifest
+  ansible.builtin.command:
+    cmd: "kubectl apply -f https://github.com/antrea-io/antrea/releases/download/{{ antrea_version }}/antrea.yml"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Antrea CNI config to be written on this node
+  ansible.builtin.wait_for:
+    path: /etc/cni/net.d/10-antrea.conflist
+    state: present
+    timeout: 300
+
+- name: Restart CRI-O to clear zombie netns from pods that raced the CNI config
+  ansible.builtin.systemd:
+    name: crio
+    state: restarted
+
+- name: Wait for Kubernetes API server to recover after CRI-O restart
+  ansible.builtin.wait_for:
+    port: 6443
+    host: 127.0.0.1
+    state: started
+    timeout: 120
+    delay: 5
+
+- name: Wait for Antrea controller pod to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace kube-system
+      --selector=app=antrea,component=antrea-controller
+      --for=condition=Ready
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
+- name: Wait for Antrea agent DaemonSet pods to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace kube-system
+      --selector=app=antrea,component=antrea-agent
+      --for=condition=Ready
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  failed_when: false
+  changed_when: false
+  # Non-fatal: antrea-agent readiness depends on the Cloud Controller Manager
+  # initializing node addresses (cloud-provider=external). The CCM is installed
+  # in a later play. The agent will become Ready once the node is fully initialized.
+  ignore_errors: true

@@ -1,9 +1,15 @@
 ---
-- name: Hold Kubectl, Kubeadm e Kubelet packages
-  dpkg_selections:
-    name: "{{ item }}"
+- name: Hold kubelet at current version
+  ansible.builtin.dpkg_selections:
+    name: kubelet
     selection: hold
-  loop: 
-  - kubectl
-  - kubeadm
-  - kubelet
+
+- name: Hold kubeadm at current version
+  ansible.builtin.dpkg_selections:
+    name: kubeadm
+    selection: hold
+
+- name: Hold kubectl at current version
+  ansible.builtin.dpkg_selections:
+    name: kubectl
+    selection: hold

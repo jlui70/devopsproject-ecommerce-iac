@@ -1,5 +1,12 @@
 ---
-- include_tasks: terraform-output.yml
-- include_tasks: upload-template.yml
-- include_tasks: kubeadm-init.yml
-- include_tasks: join-commands.yml
+- name: Retrieve Terraform outputs from S3 state file
+  ansible.builtin.include_tasks: terraform-output.yml
+
+- name: Render and upload kubeadm init configuration
+  ansible.builtin.include_tasks: upload-template.yml
+
+- name: Run kubeadm init on first control plane node
+  ansible.builtin.include_tasks: kubeadm-init.yml
+
+- name: Generate and distribute join commands for workers and control planes
+  ansible.builtin.include_tasks: join-commands.yml

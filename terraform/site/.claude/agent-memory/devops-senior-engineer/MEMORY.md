@@ -1,0 +1,1 @@
+- [ADR-0007 Observabilidade](project_adr0007_observability.md) — Stack observability/ Terraform + roles fluent-bit e metricbeat Ansible implementadas em 2026-06-27

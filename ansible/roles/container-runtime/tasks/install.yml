@@ -1,8 +1,13 @@
 ---
 - name: Install CRI-O
-  apt:
+  ansible.builtin.apt:
     name:
-    - cri-o
+      - cri-o
     state: present
-    update_cache: true
-  notify: Start CRI-O Service
+
+- name: Enable and start CRI-O service
+  ansible.builtin.systemd:
+    name: cri-o
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,13 +1,13 @@
 resource "aws_subnet" "private" {
-  count = length(var.vpc.private_subnets)
+  for_each = var.vpc.private_subnet_cidrs
 
   vpc_id                  = aws_vpc.this.id
-  cidr_block              = var.vpc.private_subnets[count.index].cidr_block
-  availability_zone       = var.vpc.private_subnets[count.index].availability_zone
-  map_public_ip_on_launch = var.vpc.private_subnets[count.index].map_public_ip_on_launch
+  cidr_block              = each.value
+  availability_zone       = each.key
+  map_public_ip_on_launch = false
 
   tags = {
-    Name                              = "${var.vpc.name}-${var.vpc.private_subnets[count.index].name}",
-    "kubernetes.io/role/internal-elb" = 1
+    Name                              = "${var.vpc.name}-private-${each.key}"
+    "kubernetes.io/role/internal-elb" = "1"
   }
 }

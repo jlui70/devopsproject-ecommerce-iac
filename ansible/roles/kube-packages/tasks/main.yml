@@ -1,4 +1,16 @@
 ---
-- include_tasks: repository.yml
-- include_tasks: install.yml
-- include_tasks: hold.yml
+- name: Add Kubernetes apt repository
+  ansible.builtin.include_tasks: repository.yml
+
+- name: Install Kubernetes packages
+  ansible.builtin.include_tasks: install.yml
+
+- name: Hold Kubernetes packages at installed version
+  ansible.builtin.include_tasks: hold.yml
+
+- name: Enable and start kubelet service
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    state: started
+    daemon_reload: true

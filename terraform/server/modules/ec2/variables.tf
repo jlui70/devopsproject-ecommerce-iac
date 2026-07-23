@@ -1,46 +1,27 @@
-variable "tags" {
+variable "config" {
+  description = "Configuração do Launch Template e ASG"
   type = object({
-    Project     = string
-    Environment = string
-  })
-}
-
-variable "instance_profile_name" {
-  type = string
-}
-
-variable "launch_template" {
-  type = object({
-    name                                 = string
-    disable_api_stop                     = bool
-    disable_api_termination              = bool
-    instance_type                        = string
-    instance_initiated_shutdown_behavior = string
-    user_data                            = string
-    key_name                             = string
-    image_id                             = string
-    vpc_security_group_ids               = list(string)
-    ebs = object({
-      size                  = number
-      delete_on_termination = bool
+    name                        = string
+    ami_id                      = string
+    instance_type               = string
+    ebs_size_gb                 = number
+    instance_profile_name       = string
+    security_group_ids          = list(string)
+    subnet_ids                  = list(string)
+    key_name                    = string
+    http_put_response_hop_limit = number
+    asg = object({
+      min     = number
+      desired = number
+      max     = number
     })
-  })
-}
-
-variable "auto_scaling_group" {
-  type = object({
-    name                      = string
-    max_size                  = number
-    min_size                  = number
-    desired_capacity          = number
-    health_check_grace_period = number
-    health_check_type         = string
-    vpc_zone_identifier       = list(string)
-    target_group_arns         = list(string)
-    instance_tags = map(string)
-    instance_maintenance_policy = object({
+    target_group_arns   = list(string)
+    suspended_processes = list(string)
+    maintenance_policy = object({
       min_healthy_percentage = number
       max_healthy_percentage = number
     })
+    extra_tags = map(string)
   })
+  nullable = false
 }

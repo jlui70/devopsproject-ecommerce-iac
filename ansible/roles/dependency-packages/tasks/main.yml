@@ -1,10 +1,19 @@
 ---
-- name: Installing Dependency Packages
-  apt:
-    name: 
-      - apt-transport-https
-      - ca-certificates 
-      - curl 
-      - gpg
-      - software-properties-common
+- name: Update apt cache
+  ansible.builtin.apt:
     update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base dependency packages
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - python3-boto3
+      - awscli
+      - git
+    state: present

@@ -1,5 +1,7 @@
-resource "aws_eip" "this" {
-  count  = length(aws_subnet.public)
+resource "aws_eip" "nat" {
+  for_each = toset(var.vpc.availability_zones)
+
   domain = "vpc"
-  tags   = { Name = "${var.vpc.eip_name}-${aws_subnet.public[count.index].availability_zone}" }
+
+  tags = { Name = "${var.vpc.name}-nat-eip-${each.key}" }
 }

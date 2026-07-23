@@ -1,8 +1,44 @@
 ---
-- name: Installing CSI Driver
-  shell: |
-    helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver
-    helm repo update
-    helm upgrade --install aws-ebs-csi-driver \
-      --namespace kube-system \
-      aws-ebs-csi-driver/aws-ebs-csi-driver
+- name: Add AWS EBS CSI driver Helm repository
+  ansible.builtin.command:
+    cmd: "helm repo add aws-ebs-csi-driver https://kubernetes-sigs.github.io/aws-ebs-csi-driver"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "helm repo update"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Install or upgrade AWS EBS CSI driver via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver
+      --namespace kube-system
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Create gp3 StorageClass as cluster default
+  ansible.builtin.command:
+    cmd: kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: gp3
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+      provisioner: ebs.csi.aws.com
+      volumeBindingMode: WaitForFirstConsumer
+      reclaimPolicy: Delete
+      parameters:
+        type: gp3
+        encrypted: "true"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true

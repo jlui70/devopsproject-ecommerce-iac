@@ -1,26 +1,119 @@
-resource "aws_sqs_queue" "nsse" {
-  count = length(var.queues)
+# --- DLQs (criadas antes das filas de origem para o redrive_policy) ---
 
-  name                      = var.queues[count.index].name
-  delay_seconds             = var.queues[count.index].delay_seconds
-  max_message_size          = var.queues[count.index].max_message_size
-  message_retention_seconds = var.queues[count.index].message_retention_seconds
-  receive_wait_time_seconds = var.queues[count.index].receive_wait_time_seconds
-  sqs_managed_sse_enabled   = var.queues[count.index].sqs_managed_sse_enabled
-  policy                    = data.aws_iam_policy_document.sqs_policy.json
+resource "aws_sqs_queue" "email_notification_dlq" {
+  name                      = var.sqs.email_notification_dlq_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
 
-  tags = var.tags
+  tags = {
+    Name = var.sqs.email_notification_dlq_name
+  }
 }
 
-resource "aws_sqs_queue_redrive_policy" "nsse" {
-  count = length(aws_sqs_queue.nsse)
+resource "aws_sqs_queue" "product_stock_dlq" {
+  name                      = var.sqs.product_stock_dlq_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
 
-  queue_url = aws_sqs_queue.nsse[count.index].id
+  tags = {
+    Name = var.sqs.product_stock_dlq_name
+  }
+}
+
+resource "aws_sqs_queue" "invoice_dlq" {
+  name                      = var.sqs.invoice_dlq_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
+
+  tags = {
+    Name = var.sqs.invoice_dlq_name
+  }
+}
+
+# --- Filas de producao ---
+
+resource "aws_sqs_queue" "email_notification" {
+  name                      = var.sqs.email_notification_queue_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
+
   redrive_policy = jsonencode({
-    deadLetterTargetArn = one([
-      for queue in aws_sqs_queue.deadletter : queue.arn
-    if startswith(queue.name, aws_sqs_queue.nsse[count.index].name)])
-    maxReceiveCount = 2
+    deadLetterTargetArn = aws_sqs_queue.email_notification_dlq.arn
+    maxReceiveCount     = 2
+  })
+
+  tags = {
+    Name = var.sqs.email_notification_queue_name
+  }
+}
+
+resource "aws_sqs_queue" "product_stock" {
+  name                      = var.sqs.product_stock_queue_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.product_stock_dlq.arn
+    maxReceiveCount     = 2
+  })
+
+  tags = {
+    Name = var.sqs.product_stock_queue_name
+  }
+}
+
+resource "aws_sqs_queue" "invoice" {
+  name                      = var.sqs.invoice_queue_name
+  message_retention_seconds = 86400
+  max_message_size          = 2048
+  receive_wait_time_seconds = 10
+  sqs_managed_sse_enabled   = true
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.invoice_dlq.arn
+    maxReceiveCount     = 2
+  })
+
+  tags = {
+    Name = var.sqs.invoice_queue_name
+  }
+}
+
+# --- Redrive allow policies nas DLQs (byQueue apontando para a fila de origem) ---
+
+resource "aws_sqs_queue_redrive_allow_policy" "email_notification_dlq" {
+  queue_url = aws_sqs_queue.email_notification_dlq.id
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.email_notification.arn]
   })
 }
 
+resource "aws_sqs_queue_redrive_allow_policy" "product_stock_dlq" {
+  queue_url = aws_sqs_queue.product_stock_dlq.id
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.product_stock.arn]
+  })
+}
+
+resource "aws_sqs_queue_redrive_allow_policy" "invoice_dlq" {
+  queue_url = aws_sqs_queue.invoice_dlq.id
+
+  redrive_allow_policy = jsonencode({
+    redrivePermission = "byQueue"
+    sourceQueueArns   = [aws_sqs_queue.invoice.arn]
+  })
+}

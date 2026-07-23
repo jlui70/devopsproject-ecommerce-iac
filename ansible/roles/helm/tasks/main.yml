@@ -1,6 +1,25 @@
 ---
-- name: Installing Helm
-  shell: |
-    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-    chmod 700 get_helm.sh
-    ./get_helm.sh
+- name: Check if Helm is already installed
+  ansible.builtin.command:
+    cmd: "helm version --short"
+  register: helm_version_check
+  failed_when: false
+  changed_when: false
+
+- name: Download Helm installer script
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+    dest: /tmp/get-helm-3.sh
+    mode: "0700"
+  when: helm_version_check.rc != 0
+
+- name: Install Helm via official installer script
+  ansible.builtin.command:
+    cmd: "/tmp/get-helm-3.sh"
+  when: helm_version_check.rc != 0
+  changed_when: true
+
+- name: Verify Helm installation
+  ansible.builtin.command:
+    cmd: "helm version --short"
+  changed_when: false

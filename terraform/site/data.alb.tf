@@ -1,3 +1,3 @@
-data "aws_lb" "this" {
-  name = "nsse-ingress-prod"
+data "aws_lb" "cluster" {
+  name = var.site.alb_name
 }
