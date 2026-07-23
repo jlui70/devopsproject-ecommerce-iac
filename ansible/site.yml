@@ -106,3 +106,21 @@
   become: true
   roles:
     - metricbeat
+
+- name: Install KEDA event-driven autoscaler
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - keda
+
+- name: Install Argo Rollouts for Blue/Green deployments
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - argo-rollouts
+
+- name: Install ArgoCD, apply GitOps Application and create ECR pull secret
+  hosts: control_plane[0]
+  become: true
+  roles:
+    - argocd

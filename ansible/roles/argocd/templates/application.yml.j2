@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devopsproject-ecommerce
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ gitops_repo_url }}
+    targetRevision: HEAD
+    path: production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dpe
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: dpe-ecr-image-pull-credentials-prod
+      namespace: dpe
+      jsonPointers:
+        - /data

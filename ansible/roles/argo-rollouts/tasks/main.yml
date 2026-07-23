@@ -1,0 +1,38 @@
+---
+- name: Add Argo Helm repository
+  ansible.builtin.command:
+    cmd: "helm repo add argo https://argoproj.github.io/argo-helm"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "helm repo update"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Install or upgrade Argo Rollouts via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install argo-rollouts argo/argo-rollouts
+      --namespace argo-rollouts
+      --create-namespace
+      --timeout 120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Argo Rollouts controller to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace argo-rollouts
+      --selector=app.kubernetes.io/name=argo-rollouts
+      --for=condition=Ready
+      --timeout=120s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

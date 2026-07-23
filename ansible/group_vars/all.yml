@@ -15,3 +15,7 @@ ansible_aws_ssm_region: "us-east-1"
 ansible_aws_ssm_timeout: 60
 antrea_version: "v2.1.1"
 external_dns_chart_version: "8.3.4"
+keda_chart_version: "2.14.3"
+ecr_registry: "692430448478.dkr.ecr.us-east-1.amazonaws.com"
+ecr_pull_secret_name: "dpe-ecr-image-pull-credentials-prod"
+gitops_repo_url: "https://github.com/jlui70/devopsproject-ecommerce-gitops"
