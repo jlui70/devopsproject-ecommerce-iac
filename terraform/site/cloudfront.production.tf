@@ -13,7 +13,7 @@ resource "aws_cloudfront_distribution" "production" {
   # Phase 1: apply with lifecycle ignore_changes active (this file as-is).
   # Phase 2: remove the ignore_changes block below and apply again to attach
   #          the continuous_deployment_policy_id.
-  continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id
+  # continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id # Phase 2: uncomment after first apply
 
   origin {
     origin_id                = "s3-site"

@@ -65,6 +65,14 @@ daemonset:
       cpu: 300m
       memory: 512Mi
 
+  # Run only on control-plane nodes (t3.medium 4GB) to avoid OOM on t3.micro workers
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+
 deployment:
   metricbeatConfig:
     metricbeat.yml: |
@@ -110,3 +118,11 @@ deployment:
     limits:
       cpu: 300m
       memory: 512Mi
+
+  # Run only on control-plane nodes (t3.medium 4GB) to avoid OOM on t3.micro workers
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""

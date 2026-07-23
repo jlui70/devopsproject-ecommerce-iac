@@ -10,9 +10,27 @@
   register: opensearch_endpoint_output
   changed_when: false
 
+- name: Read opensearch_master_password from Terraform state
+  ansible.builtin.shell:
+    cmd: >
+      python3 -c "
+      import json
+      s = json.load(open('/tmp/terraform-observability.tfstate'))
+      for r in s['resources']:
+          if r['type'] == 'aws_opensearch_domain' and r['name'] == 'logs':
+              opts = r['instances'][0]['attributes']['advanced_security_options']
+              print(opts[0]['master_user_options'][0]['master_user_password'])
+              break
+      "
+  register: opensearch_password_output
+  changed_when: false
+  no_log: true
+
 - name: Set OpenSearch facts for all hosts
   ansible.builtin.set_fact:
     opensearch_endpoint: "{{ opensearch_endpoint_output.stdout | trim }}"
+    opensearch_master_password: "{{ opensearch_password_output.stdout | trim }}"
   delegate_to: "{{ item }}"
   delegate_facts: true
   loop: "{{ groups['all'] }}"
+  no_log: true
