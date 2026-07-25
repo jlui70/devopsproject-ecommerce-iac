@@ -7,7 +7,12 @@ resource "aws_cloudfront_distribution" "production" {
   aliases             = [var.site.domain]
   web_acl_id          = aws_wafv2_web_acl.this.arn
 
-  continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id
+  # continuous_deployment_policy_id is attached automatically after creation
+  # by terraform_data.attach_continuous_deployment_policy (local-exec).
+  # The lifecycle block prevents Terraform from removing it on subsequent plans.
+  lifecycle {
+    ignore_changes = [continuous_deployment_policy_id]
+  }
 
   origin {
     origin_id                = "s3-site"
