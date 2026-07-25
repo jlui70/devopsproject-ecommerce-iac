@@ -1,16 +1,19 @@
 resource "aws_cloudfront_distribution" "production" {
   enabled             = true
   is_ipv6_enabled     = true
-  http_version        = "http2"
+  http_version        = "http2and3"
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
   aliases             = [var.site.domain]
-  # continuous_deployment_policy_id is attached automatically after creation
-  # by terraform_data.attach_continuous_deployment_policy (local-exec).
-  # The lifecycle block prevents Terraform from removing it on subsequent plans.
-  lifecycle {
-    ignore_changes = [continuous_deployment_policy_id]
-  }
+  web_acl_id          = aws_wafv2_web_acl.this.arn
+
+  # IMPORTANT: Two-phase apply required.
+  # The AWS API requires the staging distribution to exist before associating
+  # the continuous deployment policy to the production distribution.
+  # Phase 1: apply with lifecycle ignore_changes active (this file as-is).
+  # Phase 2: remove the ignore_changes block below and apply again to attach
+  #          the continuous_deployment_policy_id.
+  # continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id # Phase 2: uncomment after first apply
 
   origin {
     origin_id                = "s3-site"
@@ -121,6 +124,8 @@ resource "aws_cloudfront_distribution" "production" {
     prefix          = "cloudfront/"
   }
 
+  # Phase 1: ignore continuous_deployment_policy_id on first apply because the
+  # AWS API requires the staging distribution to be created first.
   # SPA routing: redireciona 403/404 do S3 para index.html (React Router cuida das rotas)
   custom_error_response {
     error_code         = 403
@@ -134,4 +139,8 @@ resource "aws_cloudfront_distribution" "production" {
     response_page_path = "/index.html"
   }
 
+  # Phase 2: remove this lifecycle block and re-apply to wire up the policy.
+  lifecycle {
+    ignore_changes = [continuous_deployment_policy_id]
+  }
 }
