@@ -1,6 +1,20 @@
 ---
+- name: Check if observability Terraform state exists in S3
+  ansible.builtin.command:
+    cmd: "aws s3 ls s3://{{ terraform_state_bucket }}/observability/terraform.tfstate"
+  register: observability_state
+  changed_when: false
+  failed_when: false
+
+- name: Skip Metricbeat installation (observability stack not deployed yet)
+  ansible.builtin.debug:
+    msg: "Observability state not found in S3 — Metricbeat will be installed when the observability stack is deployed and this playbook is re-run."
+  when: observability_state.rc != 0
+
 - name: Retrieve OpenSearch outputs from Terraform state
   ansible.builtin.include_tasks: terraform-output.yml
+  when: observability_state.rc == 0
 
 - name: Install Metricbeat via Helm
   ansible.builtin.include_tasks: install.yml
+  when: observability_state.rc == 0
