@@ -1,7 +1,7 @@
 resource "aws_cloudfront_distribution" "production" {
   enabled             = true
   is_ipv6_enabled     = true
-  http_version        = "http2and3"
+  http_version        = "http2"
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
   aliases             = [var.site.domain]
