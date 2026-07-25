@@ -9,8 +9,9 @@ data "aws_secretsmanager_secret_version" "aurora_master" {
 }
 
 resource "aws_secretsmanager_secret" "app" {
-  name        = "devopsproject/app/secrets"
-  description = "Segredos da aplicacao devopsproject-ecommerce (connection strings, identity key)"
+  name                    = "devopsproject/app/secrets"
+  description             = "Segredos da aplicacao devopsproject-ecommerce (connection strings, identity key)"
+  recovery_window_in_days = 0
 
   tags = {
     Name = "devopsproject-app-secrets"

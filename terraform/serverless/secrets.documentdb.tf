@@ -5,8 +5,9 @@ resource "random_password" "docdb" {
 }
 
 resource "aws_secretsmanager_secret" "docdb" {
-  name        = "devopsproject/docdb/master-user-secret"
-  description = "Senha do usuario master do DocumentDB (devopsproject)"
+  name                    = "devopsproject/docdb/master-user-secret"
+  description             = "Senha do usuario master do DocumentDB (devopsproject)"
+  recovery_window_in_days = 0
 
   tags = {
     Name = "devopsproject-docdb-master-secret"
