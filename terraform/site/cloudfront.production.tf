@@ -7,13 +7,7 @@ resource "aws_cloudfront_distribution" "production" {
   aliases             = [var.site.domain]
   web_acl_id          = aws_wafv2_web_acl.this.arn
 
-  # IMPORTANT: Two-phase apply required.
-  # The AWS API requires the staging distribution to exist before associating
-  # the continuous deployment policy to the production distribution.
-  # Phase 1: apply with lifecycle ignore_changes active (this file as-is).
-  # Phase 2: remove the ignore_changes block below and apply again to attach
-  #          the continuous_deployment_policy_id.
-  # continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id # Phase 2: uncomment after first apply
+  continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id
 
   origin {
     origin_id                = "s3-site"
@@ -124,8 +118,6 @@ resource "aws_cloudfront_distribution" "production" {
     prefix          = "cloudfront/"
   }
 
-  # Phase 1: ignore continuous_deployment_policy_id on first apply because the
-  # AWS API requires the staging distribution to be created first.
   # SPA routing: redireciona 403/404 do S3 para index.html (React Router cuida das rotas)
   custom_error_response {
     error_code         = 403
@@ -139,8 +131,4 @@ resource "aws_cloudfront_distribution" "production" {
     response_page_path = "/index.html"
   }
 
-  # Phase 2: remove this lifecycle block and re-apply to wire up the policy.
-  lifecycle {
-    ignore_changes = [continuous_deployment_policy_id]
-  }
 }
