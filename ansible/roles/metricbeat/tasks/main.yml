@@ -1,14 +1,21 @@
 ---
-- name: Check if observability Terraform state exists in S3
-  ansible.builtin.command:
-    cmd: "aws s3 ls s3://{{ terraform_state_bucket }}/observability/terraform.tfstate"
+- name: Check if observability state has a valid opensearch_domain_endpoint output
+  ansible.builtin.shell:
+    cmd: |
+      aws s3 cp s3://{{ terraform_state_bucket }}/observability/terraform.tfstate /tmp/terraform-observability.tfstate 2>/dev/null && \
+      python3 -c "
+      import json, sys
+      s = json.load(open('/tmp/terraform-observability.tfstate'))
+      v = s.get('outputs', {}).get('opensearch_domain_endpoint', {}).get('value')
+      sys.exit(0 if v else 1)
+      "
   register: observability_state
   changed_when: false
   failed_when: false
 
 - name: Skip Metricbeat installation (observability stack not deployed yet)
   ansible.builtin.debug:
-    msg: "Observability state not found in S3 — Metricbeat will be installed when the observability stack is deployed and this playbook is re-run."
+    msg: "Observability state not found or opensearch_domain_endpoint output not ready — Metricbeat will be installed when the observability stack is deployed and this playbook is re-run."
   when: observability_state.rc != 0
 
 - name: Retrieve OpenSearch outputs from Terraform state
