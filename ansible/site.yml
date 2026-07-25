@@ -98,12 +98,14 @@
 - name: Install Fluent Bit log shipper
   hosts: control_plane[0]
   become: true
+  tags: fluent-bit
   roles:
     - fluent-bit
 
 - name: Install Metricbeat metrics shipper
   hosts: control_plane[0]
   become: true
+  tags: metricbeat
   roles:
     - metricbeat
 
