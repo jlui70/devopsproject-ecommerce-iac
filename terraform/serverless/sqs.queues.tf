@@ -3,7 +3,6 @@
 resource "aws_sqs_queue" "email_notification_dlq" {
   name                      = var.sqs.email_notification_dlq_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 
@@ -15,7 +14,6 @@ resource "aws_sqs_queue" "email_notification_dlq" {
 resource "aws_sqs_queue" "product_stock_dlq" {
   name                      = var.sqs.product_stock_dlq_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 
@@ -27,7 +25,6 @@ resource "aws_sqs_queue" "product_stock_dlq" {
 resource "aws_sqs_queue" "invoice_dlq" {
   name                      = var.sqs.invoice_dlq_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 
@@ -41,7 +38,6 @@ resource "aws_sqs_queue" "invoice_dlq" {
 resource "aws_sqs_queue" "email_notification" {
   name                      = var.sqs.email_notification_queue_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 
@@ -58,7 +54,6 @@ resource "aws_sqs_queue" "email_notification" {
 resource "aws_sqs_queue" "product_stock" {
   name                      = var.sqs.product_stock_queue_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 
@@ -75,7 +70,6 @@ resource "aws_sqs_queue" "product_stock" {
 resource "aws_sqs_queue" "invoice" {
   name                      = var.sqs.invoice_queue_name
   message_retention_seconds = 86400
-  max_message_size          = 2048
   receive_wait_time_seconds = 10
   sqs_managed_sse_enabled   = true
 

@@ -32,7 +32,7 @@
       helm upgrade --install fluent-bit fluent/fluent-bit
       --namespace logging
       --values /tmp/fluent-bit-values.yaml
-      --timeout 300s
+      --timeout 45s
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
@@ -42,7 +42,7 @@
     cmd: >
       kubectl rollout status daemonset/fluent-bit
       --namespace logging
-      --timeout=120s
+      --timeout=45s
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: false

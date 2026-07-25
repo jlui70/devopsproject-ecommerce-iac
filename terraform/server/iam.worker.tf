@@ -125,6 +125,50 @@ data "aws_iam_policy_document" "worker_inline" {
       "arn:aws:secretsmanager:us-east-1:692430448478:secret:devopsproject/*",
     ]
   }
+
+  # Order service — Lambda invocation (order-confirmed gateway)
+  statement {
+    sid    = "LambdaInvokeOrderConfirmed"
+    effect = "Allow"
+    actions = [
+      "lambda:InvokeFunction",
+    ]
+    resources = [
+      "arn:aws:lambda:us-east-1:692430448478:function:orderConfirmedLambdaFunction",
+    ]
+  }
+
+  # Application SQS — Main (ProductStockQueue), InvoiceGenerator, Notificator
+  statement {
+    sid    = "AppSQSAccess"
+    effect = "Allow"
+    actions = [
+      "sqs:GetQueueUrl",
+      "sqs:GetQueueAttributes",
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:SendMessage",
+      "sqs:ChangeMessageVisibility",
+    ]
+    resources = [
+      "arn:aws:sqs:us-east-1:692430448478:ProductStockQueue",
+      "arn:aws:sqs:us-east-1:692430448478:EmailNotificationQueue",
+      "arn:aws:sqs:us-east-1:692430448478:InvoiceQueue",
+      "arn:aws:sqs:us-east-1:692430448478:ProductStockQueueDlq",
+      "arn:aws:sqs:us-east-1:692430448478:EmailNotificationQueueDlq",
+      "arn:aws:sqs:us-east-1:692430448478:InvoiceQueueDlq",
+    ]
+  }
+
+  # Notificator — SES send (order-confirmed email)
+  statement {
+    sid    = "SESSendEmail"
+    effect = "Allow"
+    actions = [
+      "ses:SendTemplatedEmail",
+    ]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "worker" {

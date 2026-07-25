@@ -70,7 +70,7 @@
       --namespace kube-system
       --selector=app=antrea,component=antrea-agent
       --for=condition=Ready
-      --timeout=120s
+      --timeout=45s
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   failed_when: false

@@ -91,10 +91,12 @@ variable "ses" {
 }
 
 variable "app" {
-  description = "Recursos de aplicacao (bucket S3 e caminho do CA do DocumentDB)"
+  description = "Recursos e credenciais da aplicacao (S3, DocumentDB CA, identity)"
   type = object({
     s3_bucket               = string
     documentdb_ca_cert_path = string
+    identity_admin_password = string
   })
-  nullable = false
+  sensitive = true
+  nullable  = false
 }

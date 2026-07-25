@@ -24,12 +24,17 @@
       "
   register: opensearch_password_output
   changed_when: false
+  failed_when: false
   no_log: true
+  when: opensearch_master_password is not defined
 
 - name: Set OpenSearch facts for all hosts
   ansible.builtin.set_fact:
     opensearch_endpoint: "{{ opensearch_endpoint_output.stdout | trim }}"
-    opensearch_master_password: "{{ opensearch_password_output.stdout | trim }}"
+    opensearch_master_password: >-
+      {{ opensearch_master_password
+         if (opensearch_master_password is defined and opensearch_master_password | length > 0)
+         else opensearch_password_output.stdout | trim }}
   delegate_to: "{{ item }}"
   delegate_facts: true
   loop: "{{ groups['all'] }}"

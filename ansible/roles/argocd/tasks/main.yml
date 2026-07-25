@@ -90,11 +90,22 @@
 # ── ECR Image Pull Secret (aguarda namespace dpe criado pelo ArgoCD) ─────────
 - name: Wait for dpe namespace to be created by ArgoCD
   ansible.builtin.command:
-    cmd: "kubectl wait namespace dpe --for=jsonpath={.status.phase}=Active --timeout=300s"
+    cmd: "kubectl wait namespace dpe --for=jsonpath={.status.phase}=Active --timeout=45s"
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: false
   failed_when: false
+  register: dpe_ns_wait
+  retries: 8
+  delay: 15
+  until: dpe_ns_wait.rc == 0
+
+- name: Verify dpe namespace exists before creating ECR secret
+  ansible.builtin.command:
+    cmd: "kubectl get namespace dpe"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
 
 - name: Get ECR login token
   ansible.builtin.command:

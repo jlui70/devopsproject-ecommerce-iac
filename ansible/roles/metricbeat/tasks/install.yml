@@ -46,7 +46,7 @@
       --version 7.17.3
       --namespace observability
       --values /tmp/metricbeat-values.yaml
-      --timeout 300s
+      --timeout 45s
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true

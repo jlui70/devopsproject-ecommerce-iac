@@ -126,6 +126,19 @@ resource "aws_cloudfront_distribution" "production" {
 
   # Phase 1: ignore continuous_deployment_policy_id on first apply because the
   # AWS API requires the staging distribution to be created first.
+  # SPA routing: redireciona 403/404 do S3 para index.html (React Router cuida das rotas)
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
   # Phase 2: remove this lifecycle block and re-apply to wire up the policy.
   lifecycle {
     ignore_changes = [continuous_deployment_policy_id]
