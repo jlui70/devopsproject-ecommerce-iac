@@ -26,6 +26,7 @@ import json
 with open('$TMP_FILE') as f:
     config = json.load(f)
 config['ContinuousDeploymentPolicyId'] = '$POLICY_ID'
+config['WebACLId'] = ''
 with open('$TMP_FILE', 'w') as f:
     json.dump(config, f)
 "

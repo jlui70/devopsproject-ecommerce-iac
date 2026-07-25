@@ -5,8 +5,6 @@ resource "aws_cloudfront_distribution" "production" {
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
   aliases             = [var.site.domain]
-  web_acl_id          = aws_wafv2_web_acl.this.arn
-
   # continuous_deployment_policy_id is attached automatically after creation
   # by terraform_data.attach_continuous_deployment_policy (local-exec).
   # The lifecycle block prevents Terraform from removing it on subsequent plans.
