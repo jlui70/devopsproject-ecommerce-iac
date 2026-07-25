@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "staging" {
-  bucket = var.site.staging_bucket_name
+  bucket        = var.site.staging_bucket_name
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "staging" {

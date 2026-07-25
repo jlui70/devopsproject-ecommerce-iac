@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "staging_logs" {
-  bucket = var.site.staging_logs_bucket_name
+  bucket        = var.site.staging_logs_bucket_name
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "staging_logs" {

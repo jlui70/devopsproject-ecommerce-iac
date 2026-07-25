@@ -1,5 +1,6 @@
 resource "aws_s3_bucket" "site_logs" {
-  bucket = var.site.logs_bucket_name
+  bucket        = var.site.logs_bucket_name
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "site_logs" {
