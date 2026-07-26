@@ -226,6 +226,24 @@ PYEOF
   fi
 fi
 
+# ─── Aurora password (necessária para destruir a stack serverless) ───────────
+
+if [[ -z "${TF_VAR_aurora_master_password:-}" ]]; then
+  echo ""
+  warn "A stack serverless requer TF_VAR_aurora_master_password para o destroy."
+  echo -n "  Digite a senha do Aurora (Enter para pular — Terraform pedirá interativamente): "
+  read -rs _AURORA_PWD
+  echo ""
+  if [[ -n "$_AURORA_PWD" ]]; then
+    export TF_VAR_aurora_master_password="$_AURORA_PWD"
+    ok "TF_VAR_aurora_master_password exportada"
+  else
+    warn "Senha não fornecida — o destroy da stack serverless pedirá a senha interativamente"
+  fi
+else
+  ok "TF_VAR_aurora_master_password já está definida no ambiente"
+fi
+
 # ─── OpenSearch password (necessária para destruir a stack observability) ────
 
 if [[ -z "${TF_VAR_opensearch_master_password:-}" ]]; then
