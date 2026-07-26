@@ -226,6 +226,24 @@ PYEOF
   fi
 fi
 
+# ─── OpenSearch password (necessária para destruir a stack observability) ────
+
+if [[ -z "${TF_VAR_opensearch_master_password:-}" ]]; then
+  echo ""
+  warn "A stack observability requer TF_VAR_opensearch_master_password para o destroy."
+  echo -n "  Digite a senha do OpenSearch (Enter para pular — Terraform pedirá interativamente): "
+  read -rs _OPENSEARCH_PWD
+  echo ""
+  if [[ -n "$_OPENSEARCH_PWD" ]]; then
+    export TF_VAR_opensearch_master_password="$_OPENSEARCH_PWD"
+    ok "TF_VAR_opensearch_master_password exportada"
+  else
+    warn "Senha não fornecida — o destroy da stack observability pedirá a senha interativamente"
+  fi
+else
+  ok "TF_VAR_opensearch_master_password já está definida no ambiente"
+fi
+
 # ─── FASE 4 — Terraform Destroy ─────────────────────────────────────────────
 
 log "FASE 4 — Terraform Destroy (ordem: site → observability → serverless → server → networking)"
