@@ -3,11 +3,6 @@ resource "random_password" "identity_key" {
   special = false
 }
 
-data "aws_secretsmanager_secret_version" "aurora_master" {
-  secret_id  = aws_rds_cluster.this.master_user_secret[0].secret_arn
-  depends_on = [aws_rds_cluster.this]
-}
-
 resource "aws_secretsmanager_secret" "app" {
   name                    = "devopsproject/app/secrets"
   description             = "Segredos da aplicacao devopsproject-ecommerce (connection strings, identity key)"
@@ -24,7 +19,7 @@ resource "aws_secretsmanager_secret_version" "app" {
   secret_string = jsonencode({
     CONNECTIONSTRINGS__DEFAULT = join("", [
       "User ID=${var.aurora.master_username};",
-      "Password=${jsondecode(data.aws_secretsmanager_secret_version.aurora_master.secret_string)["password"]};",
+      "Password=${var.aurora_master_password};",
       "Host=${aws_db_proxy.postgresql.endpoint};",
       "Port=5432;",
       "Database=${var.aurora.database_name};",

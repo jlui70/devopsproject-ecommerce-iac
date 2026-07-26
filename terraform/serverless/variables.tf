@@ -100,3 +100,10 @@ variable "app" {
   sensitive = true
   nullable  = false
 }
+
+variable "aurora_master_password" {
+  description = "Senha master do cluster Aurora PostgreSQL. Injetar via: export TF_VAR_aurora_master_password='<senha>'"
+  type        = string
+  sensitive   = true
+  nullable    = false
+}

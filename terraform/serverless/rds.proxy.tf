@@ -28,7 +28,7 @@ resource "aws_iam_role_policy" "rds_proxy_secret" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [aws_rds_cluster.this.master_user_secret[0].secret_arn]
+        Resource = [aws_secretsmanager_secret.aurora.arn]
       },
       {
         Effect = "Allow"
@@ -59,7 +59,7 @@ resource "aws_db_proxy" "postgresql" {
   auth {
     auth_scheme = "SECRETS"
     iam_auth    = "DISABLED"
-    secret_arn  = aws_rds_cluster.this.master_user_secret[0].secret_arn
+    secret_arn  = aws_secretsmanager_secret.aurora.arn
   }
 
   tags = {

@@ -6,8 +6,7 @@ resource "aws_rds_cluster" "this" {
 
   database_name   = var.aurora.database_name
   master_username = var.aurora.master_username
-
-  manage_master_user_password = true
+  master_password = var.aurora_master_password
 
   storage_encrypted = true
 
