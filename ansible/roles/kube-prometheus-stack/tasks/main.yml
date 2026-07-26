@@ -1,0 +1,65 @@
+---
+- name: Add Prometheus community Helm repository
+  ansible.builtin.command:
+    cmd: "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: "helm repo update"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Create monitoring namespace
+  ansible.builtin.shell:
+    cmd: "kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Render kube-prometheus-stack values file
+  ansible.builtin.template:
+    src: values.yaml.j2
+    dest: /tmp/kube-prometheus-stack-values.yaml
+    mode: "0600"
+
+- name: Install or upgrade kube-prometheus-stack via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack
+      --namespace monitoring
+      --version {{ prometheus_stack_chart_version }}
+      --values /tmp/kube-prometheus-stack-values.yaml
+      --timeout 600s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Prometheus pod to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace monitoring
+      --selector=app.kubernetes.io/name=prometheus
+      --for=condition=Ready
+      --timeout=300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
+- name: Wait for Grafana pod to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod
+      --namespace monitoring
+      --selector=app.kubernetes.io/name=grafana
+      --for=condition=Ready
+      --timeout=180s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

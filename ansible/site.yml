@@ -74,6 +74,7 @@
 - name: Install Cluster Autoscaler
   hosts: control_plane[0]
   become: true
+  tags: cluster-autoscaler
   roles:
     - cluster-autoscaler
 
@@ -114,6 +115,13 @@
   become: true
   roles:
     - keda
+
+- name: Install kube-prometheus-stack (Prometheus, Grafana, Alertmanager, node-exporter)
+  hosts: control_plane[0]
+  become: true
+  tags: kube-prometheus-stack
+  roles:
+    - kube-prometheus-stack
 
 - name: Install Argo Rollouts for Blue/Green deployments
   hosts: control_plane[0]
