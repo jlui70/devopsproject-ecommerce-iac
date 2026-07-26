@@ -7,6 +7,9 @@ kube_state_metrics:
 daemonset:
   metricbeatConfig:
     metricbeat.yml: |
+      setup.template.enabled: false
+      setup.ilm.enabled: false
+
       metricbeat.modules:
       - module: kubernetes
         metricsets:
@@ -33,9 +36,7 @@ daemonset:
         username: "${OPENSEARCH_USERNAME}"
         password: "${OPENSEARCH_PASSWORD}"
         ssl.verification_mode: none
-        ilm.enabled: false
-        template.overwrite: true
-        number_of_replicas: 0
+        index: "metricbeat-%{+yyyy.MM.dd}"
 
   extraEnvs:
     - name: OPENSEARCH_USERNAME
@@ -76,6 +77,9 @@ daemonset:
 deployment:
   metricbeatConfig:
     metricbeat.yml: |
+      setup.template.enabled: false
+      setup.ilm.enabled: false
+
       metricbeat.modules:
       - module: kubernetes
         metricsets:
@@ -88,16 +92,14 @@ deployment:
           - state_statefulset
           - event
         period: 30s
-        hosts: ["kube-state-metrics:8080"]
+        hosts: ["metricbeat-kube-state-metrics:8080"]
 
       output.elasticsearch:
         hosts: ["https://{{ opensearch_endpoint }}:443"]
         username: "${OPENSEARCH_USERNAME}"
         password: "${OPENSEARCH_PASSWORD}"
         ssl.verification_mode: none
-        ilm.enabled: false
-        template.overwrite: true
-        number_of_replicas: 0
+        index: "metricbeat-%{+yyyy.MM.dd}"
 
   extraEnvs:
     - name: OPENSEARCH_USERNAME
