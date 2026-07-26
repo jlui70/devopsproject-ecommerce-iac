@@ -10,18 +10,15 @@
   register: opensearch_endpoint_output
   changed_when: false
 
-- name: Read opensearch_master_password from Terraform state
+- name: Read opensearch_master_password from SSM Parameter Store
   ansible.builtin.shell:
     cmd: >
-      python3 -c "
-      import json
-      s = json.load(open('/tmp/terraform-observability.tfstate'))
-      for r in s['resources']:
-          if r['type'] == 'aws_opensearch_domain' and r['name'] == 'logs':
-              opts = r['instances'][0]['attributes']['advanced_security_options']
-              print(opts[0]['master_user_options'][0]['master_user_password'])
-              break
-      "
+      aws ssm get-parameter
+      --name /devopsproject/opensearch/master-password
+      --with-decryption
+      --query Parameter.Value
+      --output text
+      --region {{ terraform_state_region }}
   register: opensearch_password_output
   changed_when: false
   failed_when: false
