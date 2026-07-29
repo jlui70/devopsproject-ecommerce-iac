@@ -1,0 +1,63 @@
+---
+- name: Add Velero Helm repository
+  ansible.builtin.command:
+    cmd: helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Update Helm repositories
+  ansible.builtin.command:
+    cmd: helm repo update
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Get AWS account ID
+  ansible.builtin.command:
+    cmd: aws sts get-caller-identity --query Account --output text
+  register: aws_account_id
+  changed_when: false
+
+- name: Install or upgrade Velero via Helm
+  ansible.builtin.command:
+    cmd: >
+      helm upgrade --install velero vmware-tanzu/velero
+      --namespace velero
+      --create-namespace
+      --version {{ velero_chart_version }}
+      --set credentials.useSecret=false
+      --set configuration.provider=aws
+      --set configuration.backupStorageLocation[0].name=default
+      --set configuration.backupStorageLocation[0].provider=aws
+      --set configuration.backupStorageLocation[0].bucket=devopsproject-velero-backups-{{ aws_account_id.stdout }}
+      --set configuration.backupStorageLocation[0].config.region=us-east-1
+      --set configuration.volumeSnapshotLocation[0].name=default
+      --set configuration.volumeSnapshotLocation[0].provider=aws
+      --set configuration.volumeSnapshotLocation[0].config.region=us-east-1
+      --set initContainers[0].name=velero-plugin-for-aws
+      --set initContainers[0].image=velero/velero-plugin-for-aws:v1.11.0
+      --set initContainers[0].volumeMounts[0].mountPath=/target
+      --set initContainers[0].volumeMounts[0].name=plugins
+      --set schedules.daily.disabled=false
+      --set schedules.daily.schedule="0 2 * * *"
+      --set schedules.daily.template.ttl=168h0m0s
+      --set schedules.daily.template.includedNamespaces[0]=dpe
+      --set schedules.daily.template.includedNamespaces[1]=monitoring
+      --set schedules.daily.template.includedNamespaces[2]=keda
+      --set schedules.daily.template.includedNamespaces[3]=argocd
+      --timeout 300s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+
+- name: Wait for Velero pod to be running
+  ansible.builtin.command:
+    cmd: >
+      kubectl wait pod --namespace velero
+      --selector=app.kubernetes.io/name=velero
+      --for=condition=Ready --timeout=180s
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false

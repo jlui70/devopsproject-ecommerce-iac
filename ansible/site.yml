@@ -41,6 +41,13 @@
   roles:
     - container-storage
 
+- name: Install Velero for automated cluster backup
+  hosts: control_plane[0]
+  become: true
+  tags: velero
+  roles:
+    - velero
+
 - name: Join worker nodes to cluster
   hosts: workers
   become: true
@@ -102,6 +109,13 @@
   tags: cert-manager
   roles:
     - cert-manager
+
+- name: Install Kyverno admission controller for policy governance
+  hosts: control_plane[0]
+  become: true
+  tags: kyverno
+  roles:
+    - kyverno
 
 - name: Install Fluent Bit log shipper
   hosts: control_plane[0]
