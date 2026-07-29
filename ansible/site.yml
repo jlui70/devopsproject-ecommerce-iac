@@ -96,6 +96,13 @@
   roles:
     - external-secrets-operator
 
+- name: Install Cert-Manager for automated TLS certificate lifecycle
+  hosts: control_plane[0]
+  become: true
+  tags: cert-manager
+  roles:
+    - cert-manager
+
 - name: Install Fluent Bit log shipper
   hosts: control_plane[0]
   become: true
