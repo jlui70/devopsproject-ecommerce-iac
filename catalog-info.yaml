@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: devopsproject-ecommerce-iac
+  description: Infrastructure as Code (Terraform) for the devopsproject-ecommerce
+    platform.
+spec:
+  type: infrastructure
+  lifecycle: experimental
+  owner: group:default/platform-admins
