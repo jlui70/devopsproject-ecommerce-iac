@@ -41,22 +41,26 @@
   roles:
     - container-storage
 
-- name: Install Velero for automated cluster backup
-  hosts: control_plane[0]
-  become: true
-  tags: velero
-  roles:
-    - velero
-
 - name: Join worker nodes to cluster
   hosts: workers
   become: true
+  tags: join-workers
   roles:
     - join-workers
 
+# 2026-08-10: tag adicionada apos falha transitoria ao vivo (worker_join_command
+# undefined nos 4 workers, delegate_facts+loop do join-commands.yml na role
+# init-cluster) — resolvida com um simples re-run do playbook completo (idempotente,
+# hosts ja unidos sao pulados). O join do segundo control plane usa o MESMO padrao
+# (delegate_facts+loop) e funcionou de primeira na mesma execucao, o que aponta pra
+# um blip transitorio (SSM Agent dos workers ainda terminando de registrar no exato
+# momento do loop) e nao um bug deterministico no mecanismo. A tag permite um retry
+# rapido e cirurgico (`--tags join-workers`) se acontecer de novo, em vez de rodar o
+# playbook inteiro (~25 min) so por causa disso.
 - name: Join additional control plane nodes
   hosts: control_plane[1:]
   become: true
+  tags: join-control-planes
   roles:
     - join-control-planes
 
@@ -97,6 +101,13 @@
   roles:
     - node-termination
 
+- name: Install Velero for automated cluster backup
+  hosts: control_plane[0]
+  become: true
+  tags: velero
+  roles:
+    - velero
+
 - name: Install External Secrets Operator
   hosts: control_plane[0]
   become: true
@@ -123,13 +134,6 @@
   tags: fluent-bit
   roles:
     - fluent-bit
-
-- name: Install Metricbeat metrics shipper
-  hosts: control_plane[0]
-  become: true
-  tags: metricbeat
-  roles:
-    - metricbeat
 
 - name: Install KEDA event-driven autoscaler
   hosts: control_plane[0]

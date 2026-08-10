@@ -66,6 +66,10 @@ ok "pré-requisitos OK"
 
 log "Buscando IDs dinâmicos na AWS"
 
+ACCOUNT_ID=$(aws sts get-caller-identity --region "$REGION" --query "Account" --output text)
+VELERO_BUCKET="devopsproject-velero-backups-${ACCOUNT_ID}"
+ok "Account ID: $ACCOUNT_ID | Velero bucket: $VELERO_BUCKET"
+
 CONTROL_PLANE_INSTANCE_ID=$(aws ec2 describe-instances \
   --region "$REGION" \
   --filters \
@@ -170,6 +174,37 @@ for BUCKET in "${S3_BUCKETS[@]}"; do
     run "aws s3api delete-objects --bucket $BUCKET --delete <versions+markers>"
   fi
 done
+
+# ─── FASE 2.5 — esvaziar bucket Velero (versioning habilitado) ──────────────
+# Necessário antes do terraform destroy server — sem isso o bucket não pode ser deletado
+
+log "FASE 2.5 — Esvaziar bucket Velero: $VELERO_BUCKET"
+
+if ! $DRY_RUN; then
+  if ! aws s3api head-bucket --bucket "$VELERO_BUCKET" --region "$REGION" 2>/dev/null; then
+    warn "Bucket $VELERO_BUCKET não encontrado — pulando"
+  else
+    VERSIONS=$(aws s3api list-object-versions --bucket "$VELERO_BUCKET" \
+      --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
+      --output json 2>/dev/null || echo '{"Objects":[]}')
+    if [[ $(echo "$VERSIONS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('Objects') or []))") -gt 0 ]]; then
+      aws s3api delete-objects --bucket "$VELERO_BUCKET" --delete "$VERSIONS" --region "$REGION" >/dev/null
+      ok "versões deletadas em $VELERO_BUCKET"
+    fi
+
+    MARKERS=$(aws s3api list-object-versions --bucket "$VELERO_BUCKET" \
+      --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
+      --output json 2>/dev/null || echo '{"Objects":[]}')
+    if [[ $(echo "$MARKERS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('Objects') or []))") -gt 0 ]]; then
+      aws s3api delete-objects --bucket "$VELERO_BUCKET" --delete "$MARKERS" --region "$REGION" >/dev/null
+      ok "delete markers removidos de $VELERO_BUCKET"
+    fi
+
+    ok "bucket $VELERO_BUCKET esvaziado"
+  fi
+else
+  run "aws s3api delete-objects --bucket $VELERO_BUCKET --delete <versions+markers>"
+fi
 
 # ─── FASE 3 — limpar Route53 (registros ExternalDNS) ───────────────────────
 

@@ -1,4 +1,6 @@
 resource "aws_iam_role" "lambda" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-execution-role"
 
   assume_role_policy = jsonencode({
@@ -16,8 +18,10 @@ resource "aws_iam_role" "lambda" {
 }
 
 resource "aws_iam_role_policy" "lambda_vpc_eni" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-vpc-eni-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -37,8 +41,10 @@ resource "aws_iam_role_policy" "lambda_vpc_eni" {
 }
 
 resource "aws_iam_role_policy" "lambda_secrets" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-secrets-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -50,8 +56,8 @@ resource "aws_iam_role_policy" "lambda_secrets" {
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          aws_rds_cluster.this.master_user_secret[0].secret_arn,
-          aws_secretsmanager_secret.docdb.arn
+          aws_secretsmanager_secret.aurora[0].arn,
+          aws_secretsmanager_secret.docdb[0].arn
         ]
       }
     ]
@@ -59,8 +65,10 @@ resource "aws_iam_role_policy" "lambda_secrets" {
 }
 
 resource "aws_iam_role_policy" "lambda_sqs" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-sqs-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -72,9 +80,9 @@ resource "aws_iam_role_policy" "lambda_sqs" {
           "sqs:SendMessage"
         ]
         Resource = [
-          aws_sqs_queue.email_notification.arn,
-          aws_sqs_queue.product_stock.arn,
-          aws_sqs_queue.invoice.arn
+          aws_sqs_queue.email_notification[0].arn,
+          aws_sqs_queue.product_stock[0].arn,
+          aws_sqs_queue.invoice[0].arn
         ]
       }
     ]
@@ -82,8 +90,10 @@ resource "aws_iam_role_policy" "lambda_sqs" {
 }
 
 resource "aws_iam_role_policy" "lambda_sns" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-sns-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -94,15 +104,17 @@ resource "aws_iam_role_policy" "lambda_sns" {
         Action = [
           "sns:Publish"
         ]
-        Resource = [aws_sns_topic.order_confirmed.arn]
+        Resource = [aws_sns_topic.order_confirmed[0].arn]
       }
     ]
   })
 }
 
 resource "aws_iam_role_policy" "lambda_s3_ca" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-s3-ca-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -122,8 +134,10 @@ resource "aws_iam_role_policy" "lambda_s3_ca" {
 }
 
 resource "aws_iam_role_policy" "lambda_logs" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-lambda-logs-policy"
-  role = aws_iam_role.lambda.id
+  role = aws_iam_role.lambda[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"

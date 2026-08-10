@@ -24,6 +24,11 @@ variable "site" {
     alb_name                     = string
     continuous_deployment_header = string
     continuous_deployment_value  = string
+    # Emenda ADR-0011 (2026-08-10): frontend estatico do ambiente de aplicacao staging.
+    # Nao confundir com staging_bucket_name/staging_logs_bucket_name acima, que sao do
+    # CloudFront Continuous Deployment (canario de config de CDN, ADR-0006/0011).
+    frontend_staging_domain      = string
+    frontend_staging_bucket_name = string
   })
   nullable = false
 }

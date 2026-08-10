@@ -1,4 +1,6 @@
 resource "aws_security_group" "postgresql" {
+  count = var.production_enabled ? 1 : 0
+
   name        = "devopsproject-postgresql"
   description = "SG para Aurora PostgreSQL: ingress 5432 de control-plane, worker e self"
   vpc_id      = local.vpc_id
@@ -9,7 +11,9 @@ resource "aws_security_group" "postgresql" {
 }
 
 resource "aws_security_group_rule" "postgresql_ingress_control_plane" {
-  security_group_id        = aws_security_group.postgresql.id
+  count = var.production_enabled ? 1 : 0
+
+  security_group_id        = aws_security_group.postgresql[0].id
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
@@ -19,7 +23,9 @@ resource "aws_security_group_rule" "postgresql_ingress_control_plane" {
 }
 
 resource "aws_security_group_rule" "postgresql_ingress_worker" {
-  security_group_id        = aws_security_group.postgresql.id
+  count = var.production_enabled ? 1 : 0
+
+  security_group_id        = aws_security_group.postgresql[0].id
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
@@ -29,7 +35,9 @@ resource "aws_security_group_rule" "postgresql_ingress_worker" {
 }
 
 resource "aws_security_group_rule" "postgresql_ingress_self" {
-  security_group_id = aws_security_group.postgresql.id
+  count = var.production_enabled ? 1 : 0
+
+  security_group_id = aws_security_group.postgresql[0].id
   type              = "ingress"
   from_port         = 5432
   to_port           = 5432
@@ -39,7 +47,9 @@ resource "aws_security_group_rule" "postgresql_ingress_self" {
 }
 
 resource "aws_security_group_rule" "postgresql_egress_all" {
-  security_group_id = aws_security_group.postgresql.id
+  count = var.production_enabled ? 1 : 0
+
+  security_group_id = aws_security_group.postgresql[0].id
   type              = "egress"
   from_port         = 0
   to_port           = 0

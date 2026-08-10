@@ -19,6 +19,28 @@
   register: aws_account_id
   changed_when: false
 
+- name: Clean Velero installation state
+  ansible.builtin.shell: |
+    NS_STATUS=$(kubectl get namespace velero -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+
+    if [ "$NS_STATUS" = "Terminating" ]; then
+      kubectl get namespace velero -o json | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" | \
+        kubectl replace --raw /api/v1/namespaces/velero/finalize -f - 2>/dev/null || true
+      kubectl rollout restart deployment/antrea-controller -n kube-system 2>/dev/null || true
+      kubectl wait --for=delete namespace/velero --timeout=60s 2>/dev/null || true
+
+    elif [ "$NS_STATUS" = "Active" ]; then
+      kubectl get secrets -n velero -l "owner=helm,name=velero" \
+        --no-headers -o custom-columns="NAME:.metadata.name,STATUS:.metadata.labels.status" \
+        2>/dev/null | grep -v "deployed" | awk '{print $1}' | \
+        xargs -r kubectl delete secret -n velero 2>/dev/null || true
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
 - name: Install or upgrade Velero via Helm
   ansible.builtin.command:
     cmd: >
@@ -26,8 +48,8 @@
       --namespace velero
       --create-namespace
       --version {{ velero_chart_version }}
+      --set upgradeCRDs=false
       --set credentials.useSecret=false
-      --set configuration.provider=aws
       --set configuration.backupStorageLocation[0].name=default
       --set configuration.backupStorageLocation[0].provider=aws
       --set configuration.backupStorageLocation[0].bucket=devopsproject-velero-backups-{{ aws_account_id.stdout }}
@@ -36,7 +58,7 @@
       --set configuration.volumeSnapshotLocation[0].provider=aws
       --set configuration.volumeSnapshotLocation[0].config.region=us-east-1
       --set initContainers[0].name=velero-plugin-for-aws
-      --set initContainers[0].image=velero/velero-plugin-for-aws:v1.11.0
+      --set initContainers[0].image=velero/velero-plugin-for-aws:v1.10.0
       --set initContainers[0].volumeMounts[0].mountPath=/target
       --set initContainers[0].volumeMounts[0].name=plugins
       --set schedules.daily.disabled=false

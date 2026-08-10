@@ -21,6 +21,26 @@
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
 
+- name: Clean ArgoCD Helm installation state
+  ansible.builtin.shell: |
+    NS_STATUS=$(kubectl get namespace argocd -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+    if [ "$NS_STATUS" = "Terminating" ]; then
+      kubectl get namespace argocd -o json | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" | \
+        kubectl replace --raw /api/v1/namespaces/argocd/finalize -f - 2>/dev/null || true
+      kubectl rollout restart deployment/antrea-controller -n kube-system 2>/dev/null || true
+      kubectl wait --for=delete namespace/argocd --timeout=60s 2>/dev/null || true
+    elif [ "$NS_STATUS" = "Active" ]; then
+      kubectl get secrets -n argocd -l "owner=helm,name=argocd" \
+        --no-headers -o custom-columns="NAME:.metadata.name,STATUS:.metadata.labels.status" \
+        2>/dev/null | grep -v "deployed" | awk '{print $1}' | \
+        xargs -r kubectl delete secret -n argocd 2>/dev/null || true
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
 - name: Install or upgrade ArgoCD via Helm
   ansible.builtin.command:
     cmd: >
@@ -88,13 +108,17 @@
   changed_when: true
 
 # ── ECR Image Pull Secret (aguarda namespace dpe criado pelo ArgoCD) ─────────
+# ATENÇÃO: `failed_when: false` foi removido de propósito (2026-08-10). Com ele, esta
+# task esgotava as 8 tentativas (2 min) sem o namespace existir e ainda assim reportava
+# "ok" — mascarando o problema real (ex.: erro de sync do ArgoCD, como um kustomize
+# apontando para um diretório que não existe no repo) até a task seguinte falhar sem
+# contexto nenhum. Deixar falhar de verdade aqui dá um erro acionável na hora certa.
 - name: Wait for dpe namespace to be created by ArgoCD
   ansible.builtin.command:
     cmd: "kubectl wait namespace dpe --for=jsonpath={.status.phase}=Active --timeout=45s"
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: false
-  failed_when: false
   register: dpe_ns_wait
   retries: 8
   delay: 15

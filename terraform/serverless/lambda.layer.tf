@@ -5,6 +5,8 @@ data "archive_file" "layer" {
 }
 
 resource "aws_lambda_layer_version" "this" {
+  count = var.production_enabled ? 1 : 0
+
   layer_name          = "devopsproject-node-modules"
   filename            = data.archive_file.layer.output_path
   source_code_hash    = data.archive_file.layer.output_base64sha256

@@ -13,6 +13,26 @@
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
 
+- name: Clean External Secrets Helm installation state
+  ansible.builtin.shell: |
+    NS_STATUS=$(kubectl get namespace external-secrets -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+    if [ "$NS_STATUS" = "Terminating" ]; then
+      kubectl get namespace external-secrets -o json | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" | \
+        kubectl replace --raw /api/v1/namespaces/external-secrets/finalize -f - 2>/dev/null || true
+      kubectl rollout restart deployment/antrea-controller -n kube-system 2>/dev/null || true
+      kubectl wait --for=delete namespace/external-secrets --timeout=60s 2>/dev/null || true
+    elif [ "$NS_STATUS" = "Active" ]; then
+      kubectl get secrets -n external-secrets -l "owner=helm,name=external-secrets" \
+        --no-headers -o custom-columns="NAME:.metadata.name,STATUS:.metadata.labels.status" \
+        2>/dev/null | grep -v "deployed" | awk '{print $1}' | \
+        xargs -r kubectl delete secret -n external-secrets 2>/dev/null || true
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
 - name: Install or upgrade External Secrets Operator via Helm
   ansible.builtin.command:
     cmd: >

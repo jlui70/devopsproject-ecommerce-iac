@@ -1,4 +1,6 @@
 resource "aws_iam_role" "rds_proxy" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-rds-proxy-role"
 
   assume_role_policy = jsonencode({
@@ -16,8 +18,10 @@ resource "aws_iam_role" "rds_proxy" {
 }
 
 resource "aws_iam_role_policy" "rds_proxy_secret" {
+  count = var.production_enabled ? 1 : 0
+
   name = "devopsproject-rds-proxy-secret-policy"
-  role = aws_iam_role.rds_proxy.id
+  role = aws_iam_role.rds_proxy[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -28,7 +32,7 @@ resource "aws_iam_role_policy" "rds_proxy_secret" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        Resource = [aws_secretsmanager_secret.aurora.arn]
+        Resource = [aws_secretsmanager_secret.aurora[0].arn]
       },
       {
         Effect = "Allow"
@@ -47,19 +51,21 @@ resource "aws_iam_role_policy" "rds_proxy_secret" {
 }
 
 resource "aws_db_proxy" "postgresql" {
+  count = var.production_enabled ? 1 : 0
+
   name                   = "devopsproject-postgresql-proxy"
   debug_logging          = false
   engine_family          = "POSTGRESQL"
   idle_client_timeout    = 300
   require_tls            = true
-  role_arn               = aws_iam_role.rds_proxy.arn
-  vpc_security_group_ids = [aws_security_group.postgresql.id]
+  role_arn               = aws_iam_role.rds_proxy[0].arn
+  vpc_security_group_ids = [aws_security_group.postgresql[0].id]
   vpc_subnet_ids         = local.private_subnets_ids
 
   auth {
     auth_scheme = "SECRETS"
     iam_auth    = "DISABLED"
-    secret_arn  = aws_secretsmanager_secret.aurora.arn
+    secret_arn  = aws_secretsmanager_secret.aurora[0].arn
   }
 
   tags = {
@@ -70,7 +76,9 @@ resource "aws_db_proxy" "postgresql" {
 }
 
 resource "aws_db_proxy_default_target_group" "postgresql" {
-  db_proxy_name = aws_db_proxy.postgresql.name
+  count = var.production_enabled ? 1 : 0
+
+  db_proxy_name = aws_db_proxy.postgresql[0].name
 
   connection_pool_config {
     connection_borrow_timeout    = 120
@@ -80,7 +88,9 @@ resource "aws_db_proxy_default_target_group" "postgresql" {
 }
 
 resource "aws_db_proxy_target" "postgresql" {
-  db_cluster_identifier = aws_rds_cluster.this.cluster_identifier
-  db_proxy_name         = aws_db_proxy.postgresql.name
-  target_group_name     = aws_db_proxy_default_target_group.postgresql.name
+  count = var.production_enabled ? 1 : 0
+
+  db_cluster_identifier = aws_rds_cluster.this[0].cluster_identifier
+  db_proxy_name         = aws_db_proxy.postgresql[0].name
+  target_group_name     = aws_db_proxy_default_target_group.postgresql[0].name
 }

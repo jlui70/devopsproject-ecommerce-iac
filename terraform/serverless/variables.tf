@@ -13,6 +13,12 @@ variable "assume_role" {
   nullable = false
 }
 
+variable "production_enabled" {
+  description = "Habilita os recursos de producao desta stack. true em envs/production.tfvars, false em envs/staging.tfvars — permite aplicar cada ambiente contra sua propria state key sem recriar o outro (ADR-0012)."
+  type        = bool
+  nullable    = false
+}
+
 variable "aurora" {
   description = "Parametros do cluster Aurora PostgreSQL Serverless v2"
   type = object({
@@ -106,4 +112,52 @@ variable "aurora_master_password" {
   type        = string
   sensitive   = true
   nullable    = false
+}
+
+# ADR-0012: bloco unico e opcional com toda a camada de dados/mensageria do
+# ambiente staging (Aurora, DocumentDB, SQS). Nulo em producao (envs/production.tfvars
+# nao declara esta variavel), preenchido em envs/staging.tfvars. `default = null` e a
+# unica excecao proposital a regra "sem default nas variaveis" deste projeto: aqui o
+# default nao carrega nenhum valor de configuracao, apenas torna o bloco opcional para
+# que o var-file de producao permaneca inalterado, conforme pedido pelo ADR-0012.
+variable "staging" {
+  description = "Parametros da camada de dados/mensageria isolada do ambiente staging (ADR-0012). Nulo quando o ambiente staging nao esta habilitado nesta aplicacao (ex.: producao)."
+  type = object({
+    enabled = bool
+
+    aurora = object({
+      cluster_identifier           = string
+      database_name                = string
+      master_username              = string
+      min_capacity                 = number
+      max_capacity                 = number
+      seconds_until_auto_pause     = number
+      backup_retention_period      = number
+      preferred_backup_window      = string
+      preferred_maintenance_window = string
+    })
+
+    docdb = object({
+      cluster_identifier           = string
+      engine_version               = string
+      instance_class               = string
+      backup_retention_period      = number
+      preferred_backup_window      = string
+      preferred_maintenance_window = string
+    })
+
+    sqs = object({
+      email_notification_queue_name = string
+      email_notification_dlq_name   = string
+      product_stock_queue_name      = string
+      product_stock_dlq_name        = string
+      invoice_queue_name            = string
+      invoice_dlq_name              = string
+    })
+
+    app = object({
+      identity_admin_password = string
+    })
+  })
+  default = null
 }

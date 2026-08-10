@@ -113,7 +113,21 @@ data "aws_iam_policy_document" "worker_inline" {
     resources = ["*"]
   }
 
-  # External Secrets Operator — Secrets Manager read
+  # External Secrets Operator — Secrets Manager read (producao + staging).
+  # Mecanismo de autenticacao do ESO num cluster kubeadm sem IRSA/EKS Pod Identity
+  # (ADR-0013): os pods leem segredos via ESO usando a instance-role do worker.
+  #
+  # Confirmado contra terraform/serverless/secrets.*.tf (ADR-0012 implementado):
+  # tanto os segredos de producao (devopsproject/app/secrets,
+  # devopsproject/docdb/master-user-secret) quanto os de staging
+  # (devopsproject/app/secrets-stg, devopsproject/docdb-stg/master-user-secret)
+  # vivem sob o mesmo namespace "devopsproject/*" — um unico padrao de prefixo
+  # cobre os dois ambientes. O segredo gerenciado do Aurora (producao e staging,
+  # via manage_master_user_password) tem ARN gerado pela AWS fora desse namespace
+  # ("rds!cluster-..."), mas nao precisa ser lido pelo ESO em runtime: o valor ja
+  # e' incorporado ao secret agregado "devopsproject/app/secrets[-stg]" em tempo
+  # de apply do Terraform (data source lido com a role de deploy, nao pela
+  # instance-role do worker).
   statement {
     sid    = "ESOSecretsManager"
     effect = "Allow"
@@ -138,7 +152,11 @@ data "aws_iam_policy_document" "worker_inline" {
     ]
   }
 
-  # Application SQS — Main (ProductStockQueue), InvoiceGenerator, Notificator
+  # Application SQS — Main (ProductStockQueue), InvoiceGenerator, Notificator.
+  # Inclui as filas -stg (ADR-0012): os pods do namespace staging rodam nos
+  # mesmos workers de producao (mesma instance-role, sem IRSA), entao o KEDA
+  # ScaledObject e os workers .NET de staging precisam do mesmo acesso as suas
+  # proprias filas.
   statement {
     sid    = "AppSQSAccess"
     effect = "Allow"
@@ -157,6 +175,12 @@ data "aws_iam_policy_document" "worker_inline" {
       "arn:aws:sqs:us-east-1:692430448478:ProductStockQueueDlq",
       "arn:aws:sqs:us-east-1:692430448478:EmailNotificationQueueDlq",
       "arn:aws:sqs:us-east-1:692430448478:InvoiceQueueDlq",
+      "arn:aws:sqs:us-east-1:692430448478:ProductStockQueue-stg",
+      "arn:aws:sqs:us-east-1:692430448478:EmailNotificationQueue-stg",
+      "arn:aws:sqs:us-east-1:692430448478:InvoiceQueue-stg",
+      "arn:aws:sqs:us-east-1:692430448478:ProductStockQueueDlq-stg",
+      "arn:aws:sqs:us-east-1:692430448478:EmailNotificationQueueDlq-stg",
+      "arn:aws:sqs:us-east-1:692430448478:InvoiceQueueDlq-stg",
     ]
   }
 

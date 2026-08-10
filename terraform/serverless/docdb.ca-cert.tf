@@ -1,5 +1,7 @@
 resource "aws_s3_object" "documentdb_ca_cert" {
-  bucket = aws_s3_bucket.app_files.id
+  count = var.production_enabled ? 1 : 0
+
+  bucket = aws_s3_bucket.app_files[0].id
   key    = "app/documentdb-ca.pem"
   source = var.app.documentdb_ca_cert_path
 

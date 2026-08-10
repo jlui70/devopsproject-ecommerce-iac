@@ -13,6 +13,39 @@
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
 
+- name: Clean Kyverno Helm installation state
+  ansible.builtin.shell: |
+    NS_STATUS=$(kubectl get namespace kyverno -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+    if [ "$NS_STATUS" = "Terminating" ]; then
+      kubectl get namespace kyverno -o json | \
+        python3 -c "import sys,json; d=json.load(sys.stdin); d['spec']['finalizers']=[]; print(json.dumps(d))" | \
+        kubectl replace --raw /api/v1/namespaces/kyverno/finalize -f - 2>/dev/null || true
+      kubectl rollout restart deployment/antrea-controller -n kube-system 2>/dev/null || true
+      kubectl wait --for=delete namespace/kyverno --timeout=60s 2>/dev/null || true
+    elif [ "$NS_STATUS" = "Active" ]; then
+      for secret in $(kubectl get secrets -n kyverno -l "owner=helm,name=kyverno" \
+          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+        status=$(kubectl get secret "$secret" -n kyverno \
+          -o jsonpath='{.metadata.labels.status}' 2>/dev/null)
+        if [ "$status" != "deployed" ]; then
+          kubectl delete secret "$secret" -n kyverno 2>/dev/null || true
+        fi
+      done
+    fi
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: false
+  failed_when: false
+
+- name: Check if Kyverno is already deployed at target version
+  ansible.builtin.command:
+    cmd: helm status kyverno -n kyverno --output json
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: kyverno_helm_status
+  changed_when: false
+  failed_when: false
+
 - name: Install or upgrade Kyverno via Helm
   ansible.builtin.command:
     cmd: >
@@ -25,6 +58,9 @@
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
+  when: >
+    kyverno_helm_status.rc != 0 or
+    (kyverno_helm_status.stdout | from_json).info.status != 'deployed'
 
 - name: Wait for Kyverno admission controller to be running
   ansible.builtin.command:

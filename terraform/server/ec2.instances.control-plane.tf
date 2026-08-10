@@ -21,6 +21,12 @@ module "control_plane" {
     extra_tags = {
       "PatchGroup"                                = "Production"
       "kubernetes.io/cluster/${var.cluster.name}" = "owned"
+      # ADR-0014: distingue as instancias de control-plane das de worker para o
+      # condition ssm:resourceTag/Role da policy de tunel SSM (github-staging-role,
+      # stack site/) — sem esta tag, nao ha como restringir ssm:StartSession
+      # somente ao control plane (PatchGroup/kubernetes.io/cluster sao compartilhados
+      # com os workers).
+      "Role" = "control-plane"
     }
   }
 }
