@@ -20,6 +20,7 @@ S3_BUCKETS=(
   "ecommerce-devopsproject.com-logs"
   "ecommerce-devopsproject.com-staging"
   "ecommerce-devopsproject.com-staging-logs"
+  "app-staging.ecommerce-devopsproject.com"
 )
 
 # ─── helpers ────────────────────────────────────────────────────────────────
@@ -314,6 +315,23 @@ tf_destroy "site" "-refresh=false"
 # observability: OpenSearch leva 10-15 min
 warn "observability pode levar 10–15 min (OpenSearch)..."
 tf_destroy "observability"
+
+# 2026-08-10 (ADR-0012): staging vive numa state key SEPARADA da mesma stack
+# serverless (serverless/staging/terraform.tfstate) e le SGs/subnet groups de
+# producao via terraform_remote_state — por isso precisa ser destruida ANTES da
+# serverless de producao (senao o destroy de staging falha tentando ler outputs
+# de um state que ja nao existe mais). Só executa se o state de staging existir
+# (deploy do zero sem staging não cria esse arquivo).
+if aws s3api head-object \
+    --bucket devopsproject-terraform-state-692430448478 \
+    --key serverless/staging/terraform.tfstate >/dev/null 2>&1; then
+  log "  destroy: serverless (staging, state key separada)"
+  run "cd \"$TERRAFORM_DIR/serverless\" && terraform init -reconfigure -backend-config=\"key=serverless/staging/terraform.tfstate\" && terraform destroy -var-file=\"envs/production.tfvars\" -var-file=\"envs/staging.tfvars\" -auto-approve"
+  run "cd \"$TERRAFORM_DIR/serverless\" && terraform init -reconfigure -backend-config=\"key=serverless/terraform.tfstate\""
+  ok "serverless (staging) destruída"
+else
+  ok "sem state de staging (serverless/staging/terraform.tfstate não existe) — nada a destruir"
+fi
 
 tf_destroy "serverless"
 tf_destroy "server"
