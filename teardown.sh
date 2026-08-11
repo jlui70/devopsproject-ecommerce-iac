@@ -125,19 +125,39 @@ else
     run "aws ssm send-command --region $REGION --instance-ids $CONTROL_PLANE_INSTANCE_ID --document-name AWS-RunShellScript ..."
   fi
 
-  log "1.3 Confirmando ALB deletado"
+  # 2026-08-10 (ADR-0011/0013): namespace staging tem seu proprio Ingress/ALB
+  # dedicado (dpe-stg-ingress-stg) e seus proprios registros ExternalDNS
+  # (staging.*). Faltava aqui antes - o ALB e os registros DNS de staging
+  # ficavam orfaos apos os nodes serem terminados na FASE 4 (ExternalDNS
+  # recriava os registros que a FASE 3 apagava, enquanto o namespace/Ingress
+  # de staging continuava existindo e os nodes ainda estavam de pe). So roda
+  # se o namespace existir (deploy sem staging não tem nada a fazer aqui).
+  log "1.2b Deletando namespace staging (se existir)"
   if ! $DRY_RUN; then
-    echo "  aguardando ALB dpe-ingress ser removido pelo ALB Controller..."
+    CMD_ID=$(aws ssm send-command \
+      --region "$REGION" \
+      --instance-ids "$CONTROL_PLANE_INSTANCE_ID" \
+      --document-name "AWS-RunShellScript" \
+      --parameters 'commands=["KUBECONFIG=/etc/kubernetes/admin.conf kubectl delete namespace staging --timeout=60s && echo OK || echo SKIP"]' \
+      --query "Command.CommandId" --output text)
+    wait_ssm_command "$CMD_ID" "$CONTROL_PLANE_INSTANCE_ID" || warn "Namespace staging pode já ter sido deletado ou não existir"
+  else
+    run "aws ssm send-command --region $REGION --instance-ids $CONTROL_PLANE_INSTANCE_ID --document-name AWS-RunShellScript ..."
+  fi
+
+  log "1.3 Confirmando ALBs deletados (produção e staging)"
+  if ! $DRY_RUN; then
+    echo "  aguardando ALBs dpe-ingress/dpe-stg-ingress serem removidos pelo ALB Controller..."
     for i in $(seq 1 24); do
       ALB=$(aws elbv2 describe-load-balancers --region "$REGION" \
-        --query "LoadBalancers[?contains(LoadBalancerName,'dpe-ingress')].LoadBalancerName" \
+        --query "LoadBalancers[?contains(LoadBalancerName,'dpe-ingress') || contains(LoadBalancerName,'ingress-stg')].LoadBalancerName" \
         --output text 2>/dev/null || echo "")
-      [[ -z "$ALB" ]] && { ok "ALB removido"; break; }
+      [[ -z "$ALB" ]] && { ok "ALBs removidos"; break; }
       echo -n "  ."; sleep 10
-      [[ $i -eq 24 ]] && warn "ALB ainda existe após 4 min — verifique manualmente antes de continuar"
+      [[ $i -eq 24 ]] && warn "ALB(s) ainda existem após 4 min ($ALB) — verifique manualmente antes de continuar (podem ficar órfãos se os nodes forem terminados antes do ALB Controller reconciliar)"
     done
   else
-    run "aws elbv2 describe-load-balancers --query LoadBalancers[?contains(LoadBalancerName,'dpe-ingress')]"
+    run "aws elbv2 describe-load-balancers --query \"LoadBalancers[?contains(LoadBalancerName,'dpe-ingress') || contains(LoadBalancerName,'ingress-stg')]\""
   fi
 fi
 
