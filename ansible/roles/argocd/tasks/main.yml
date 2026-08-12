@@ -162,3 +162,56 @@
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
+
+# CORRIGIDO (achado ao vivo no deploy do zero de 2026-08-12, Fase 11): o pull secret
+# de ECR nunca era criado no namespace `staging` — só existia no `dpe` (bloco acima).
+# Resultado: todos os pods de staging ficavam em ImagePullBackOff/ErrImagePull com
+# "authentication required", mesmo com a tag de imagem correta. O namespace `staging`
+# so existe depois da Fase 10.0a (Application do ArgoCD de staging aplicada
+# manualmente, e opcional) — por isso este bloco tem tag propria e verifica a
+# existencia do namespace antes de tentar, mesmo padrao ja usado pelo role
+# fluent-bit (skip gracioso se o pre-requisito ainda nao existe).
+- name: Check if staging namespace exists
+  ansible.builtin.command:
+    cmd: "kubectl get namespace staging"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  register: staging_ns_check
+  changed_when: false
+  failed_when: false
+  tags: ecr-secret-staging
+
+- name: Skip ECR pull secret for staging (namespace nao existe ainda)
+  ansible.builtin.debug:
+    msg: "Namespace staging nao existe ainda (Fase 10.0a nao aplicada) — pull secret sera criado quando este playbook for re-executado com --tags ecr-secret-staging, apos aplicar argocd/application-staging.yml."
+  when: staging_ns_check.rc != 0
+  tags: ecr-secret-staging
+
+- name: Create ECR image pull secret in staging namespace
+  ansible.builtin.shell:
+    cmd: >
+      kubectl create secret docker-registry {{ ecr_pull_secret_name_staging }}
+      --docker-server={{ ecr_registry }}
+      --docker-username=AWS
+      --docker-password="{{ ecr_token_output.stdout }}"
+      --namespace staging
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: staging_ns_check.rc == 0
+  changed_when: true
+  no_log: true
+  tags: ecr-secret-staging
+
+- name: Annotate staging ECR secret to prevent ArgoCD pruning
+  ansible.builtin.command:
+    cmd: >
+      kubectl annotate secret {{ ecr_pull_secret_name_staging }}
+      --namespace staging
+      argocd.argoproj.io/sync-options=Prune=false
+      --overwrite
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: staging_ns_check.rc == 0
+  changed_when: true
+  tags: ecr-secret-staging

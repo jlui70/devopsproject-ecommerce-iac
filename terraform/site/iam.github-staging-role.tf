@@ -58,9 +58,60 @@ data "aws_iam_policy_document" "github_staging" {
     resources = local.ecr_repo_arns
   }
 
+  # Leitura do manifesto/layers apos o push — necessaria para o cosign assinar a
+  # imagem (cosign sign referencia a URL completa do ECR, nao a imagem local do
+  # Docker, entao precisa falar direto com a API do registry). Achado ao vivo no
+  # deploy do zero de 2026-08-12 (Fase 11.6): sem isso, "cosign sign" falha com
+  # AccessDenied em ecr:BatchGetImage.
+  statement {
+    sid    = "ECRReadStagingImagesForSigning"
+    effect = "Allow"
+    actions = [
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = local.ecr_repo_arns
+  }
+
+  # Descoberta do control-plane e do ALB interno de staging antes de abrir o tunel
+  # SSM (smoke-test-staging). ec2:DescribeInstances e elbv2:DescribeLoadBalancers nao
+  # suportam restricao por ARN de recurso no IAM (sempre Resource "*"), entao o
+  # isolamento real fica por conta da condicao de tag no statement SSMTunnelControlPlane
+  # abaixo — esta aqui so permite achar o instance-id/DNS, nao abrir sessao nenhuma.
+  # Achado ao vivo no deploy do zero de 2026-08-12 (Fase 11.6).
+  statement {
+    sid    = "DescribeForSSMTunnelDiscovery"
+    effect = "Allow"
+    actions = [
+      "ec2:DescribeInstances",
+      "elasticloadbalancing:DescribeLoadBalancers",
+    ]
+    resources = ["*"]
+  }
+
   # Tunel SSM para o control plane (smoke test — kubectl wait via port forwarding).
-  # Document AWS-managed (sem account id no ARN) + instancia restrita por tag
-  # (Role=control-plane, ADR-0002/0014) — nunca os workers.
+  #
+  # CORRIGIDO (achado ao vivo no deploy do zero de 2026-08-12, via
+  # iam simulate-principal-policy): documento e instancia precisam ser statements
+  # SEPARADOS. Testado com o Policy Simulator: com os dois recursos no mesmo
+  # statement + condition de tag, o documento avalia como implicitDeny (ele nao
+  # carrega a tag ssm:resourceTag/Role, entao a condition nunca e satisfeita pra
+  # esse recurso especifico, mesmo estando listado no Resource) — so a instancia
+  # avaliava allowed isoladamente. O documento em si nao concede acesso a nenhuma
+  # instancia sozinho (isso quem faz e o statement de baixo); nao ha problema em
+  # deixa-lo sem condition.
+  statement {
+    sid    = "SSMPortForwardDocument"
+    effect = "Allow"
+    actions = [
+      "ssm:StartSession",
+    ]
+    resources = [
+      "arn:aws:ssm:${var.region}::document/AWS-StartPortForwardingSessionToRemoteHost",
+    ]
+  }
+
+  # Instancia restrita por tag (Role=control-plane, ADR-0002/0014) — nunca os workers.
   statement {
     sid    = "SSMTunnelControlPlane"
     effect = "Allow"
@@ -68,7 +119,6 @@ data "aws_iam_policy_document" "github_staging" {
       "ssm:StartSession",
     ]
     resources = [
-      "arn:aws:ssm:${var.region}::document/AWS-StartPortForwardingSessionToRemoteHost",
       "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:instance/*",
     ]
 

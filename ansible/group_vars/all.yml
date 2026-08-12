@@ -23,4 +23,7 @@ velero_chart_version: "7.2.1"
 # grafana_admin_password: injetar via -e grafana_admin_password='...' ou ansible-vault
 ecr_registry: "692430448478.dkr.ecr.us-east-1.amazonaws.com"
 ecr_pull_secret_name: "dpe-ecr-image-pull-credentials-prod"
+# Nome final apos o namePrefix/nameSuffix do kustomize de staging (dpe-stg- / -stg) -
+# achado ao vivo em 2026-08-12, ver comentario nas tasks do role argocd.
+ecr_pull_secret_name_staging: "dpe-stg-ecr-image-pull-credentials-stg"
 gitops_repo_url: "https://github.com/jlui70/devopsproject-ecommerce-gitops"
