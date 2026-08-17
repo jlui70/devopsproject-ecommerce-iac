@@ -1,19 +1,33 @@
 ---
+# tags: always nas 3 plays abaixo — achado ao vivo em 2026-08-17: um node worker
+# novo (ASG escalado manualmente de 4 para 5) rodou so com `--tags join-workers`
+# (atalho documentado desde 2026-08-10 para reexecutar so' o join apos falha
+# transitoria) e falhou com "Could not find the requested service kubelet: host"
+# — kubelet nunca tinha sido instalado nesse host, porque estas 3 plays nao tinham
+# tag nenhuma e por isso sao puladas por QUALQUER filtro --tags, nao so' join-workers.
+# Isso e' inofensivo em hosts ja provisionados (idempotente, nada muda) e
+# obrigatorio em host novo — por isso `always`, nao uma tag especifica: garante
+# que rodam sempre, seja o playbook completo ou qualquer execucao filtrada por
+# tag (join-workers, ecr-secret-staging, fluent-bit, etc.), sem exigir que quem
+# rodar o comando saiba adicionar essas 3 tags manualmente toda vez.
 - name: Install dependency packages on all nodes
   hosts: control_plane:workers
   become: true
+  tags: always
   roles:
     - dependency-packages
 
 - name: Install and configure CRI-O container runtime
   hosts: control_plane:workers
   become: true
+  tags: always
   roles:
     - container-runtime
 
 - name: Install Kubernetes packages
   hosts: control_plane:workers
   become: true
+  tags: always
   roles:
     - kube-packages
 
