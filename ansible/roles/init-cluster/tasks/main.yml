@@ -17,7 +17,17 @@
 # idempotentes e seguras de sempre rodar — geram um token/certificado novo a cada
 # chamada, sem tocar no cluster ja inicializado. NAO dar tags: always no role
 # init-cluster inteiro (isso incluiria kubeadm-init.yml, que nao deve rodar de novo
-# num cluster ja vivo) — so' neste include_tasks especifico.
+# num cluster ja vivo) — so' neste include.
+#
+# import_tasks (estatico), NAO include_tasks (dinamico) — 2a tentativa deste fix
+# usou include_tasks + tags: always e nao funcionou: a linha do include aparecia
+# no log ("included: .../join-commands.yml for ..."), mas nenhuma task de dentro
+# do arquivo rodava (nem "skipping", simplesmente nao apareciam). tags: applied a
+# um include_tasks marca a ACAO do include, mas nao propaga de forma confiavel pra
+# selecao por --tags das tasks internas — e' um comportamento documentado do
+# Ansible (por isso existe o sub-keyword `apply:` para esse caso especifico).
+# import_tasks resolve o arquivo em tempo de parse, antes da filtragem por tags,
+# entao a propagacao e' garantida. Sem loop/caminho dinamico aqui, seguro trocar.
 - name: Generate and distribute join commands for workers and control planes
-  ansible.builtin.include_tasks: join-commands.yml
+  ansible.builtin.import_tasks: join-commands.yml
   tags: always
