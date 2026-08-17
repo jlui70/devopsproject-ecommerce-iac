@@ -97,18 +97,30 @@ variable "ses" {
 }
 
 variable "app" {
-  description = "Recursos e credenciais da aplicacao (S3, DocumentDB CA, identity)"
+  description = "Recursos da aplicacao (S3, DocumentDB CA)"
   type = object({
     s3_bucket               = string
     documentdb_ca_cert_path = string
-    identity_admin_password = string
   })
-  sensitive = true
-  nullable  = false
+  nullable = false
 }
 
 variable "aurora_master_password" {
   description = "Senha master do cluster Aurora PostgreSQL. Injetar via: export TF_VAR_aurora_master_password='<senha>'"
+  type        = string
+  sensitive   = true
+  nullable    = false
+}
+
+variable "app_identity_admin_password" {
+  description = "Senha do usuario admin da aplicacao (producao). Nunca em .tfvars — injetar via: export TF_VAR_app_identity_admin_password='<senha>'"
+  type        = string
+  sensitive   = true
+  nullable    = false
+}
+
+variable "staging_app_identity_admin_password" {
+  description = "Senha do usuario admin da aplicacao (staging, ADR-0012). Nunca em .tfvars — injetar via: export TF_VAR_staging_app_identity_admin_password='<senha>'. Nao usada quando staging desabilitado (mesmo padrao de aurora_master_password)."
   type        = string
   sensitive   = true
   nullable    = false
@@ -153,10 +165,6 @@ variable "staging" {
       product_stock_dlq_name        = string
       invoice_queue_name            = string
       invoice_dlq_name              = string
-    })
-
-    app = object({
-      identity_admin_password = string
     })
   })
   default = null

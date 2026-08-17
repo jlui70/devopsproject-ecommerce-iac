@@ -42,7 +42,7 @@ resource "aws_secretsmanager_secret_version" "app" {
     ])
 
     IDENTITY__KEY                   = random_password.identity_key[0].result
-    IDENTITY__ADMIN__USER__PASSWORD = var.app.identity_admin_password
+    IDENTITY__ADMIN__USER__PASSWORD = var.app_identity_admin_password
 
     ORDER__LAMBDAPARAMS__FUNCTIONNAME = var.lambda.order_confirmed_function_name
   })
@@ -114,7 +114,7 @@ resource "aws_secretsmanager_secret_version" "app_staging" {
     ])
 
     IDENTITY__KEY                   = random_password.identity_key_staging[0].result
-    IDENTITY__ADMIN__USER__PASSWORD = var.staging.app.identity_admin_password
+    IDENTITY__ADMIN__USER__PASSWORD = var.staging_app_identity_admin_password
 
     # Lambda nao e duplicada para staging (fora do escopo do ADR-0012) — reaproveita
     # a mesma function de producao.
