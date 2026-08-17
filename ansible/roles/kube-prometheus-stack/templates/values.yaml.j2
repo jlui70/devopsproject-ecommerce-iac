@@ -31,12 +31,16 @@ prometheus:
         memory: 1Gi
     retention: 7d
     # Scrape KEDA operator metrics (keda_scaler_metrics_value, keda_scaler_active, etc.)
-    # Validate endpoint with: kubectl get svc -n keda after KEDA install
+    # Porta 9666 confirmada ao vivo em 2026-08-17 (kubectl get svc -n keda keda-operator
+    # -> port: 9666, name: metricsservice) — a porta 8080 anterior nunca tinha sido
+    # validada de fato (o comentario original so' dizia "validar depois"; o KEDA 2.14.3
+    # usa 9666, nao 8080). Prometheus ficava com o target keda-operator permanentemente
+    # "down" (context deadline exceeded) sem isso.
     additionalScrapeConfigs:
       - job_name: keda-operator
         static_configs:
           - targets:
-              - keda-operator.keda.svc.cluster.local:8080
+              - keda-operator.keda.svc.cluster.local:9666
 
 grafana:
   enabled: true
