@@ -34,8 +34,8 @@ resource "aws_secretsmanager_secret_version" "app" {
 
     CONNECTIONSTRINGS__MONGO = join("", [
       "mongodb://",
-      jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["username"], ":",
-      jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["password"], "@",
+      urlencode(jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["username"]), ":",
+      urlencode(jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["password"]), "@",
       aws_docdb_cluster.this[0].endpoint,
       ":27017/admin?ssl=true&sslInvalidHostNameAllowed=true",
       "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
@@ -99,8 +99,8 @@ resource "aws_secretsmanager_secret_version" "app_staging" {
 
     CONNECTIONSTRINGS__MONGO = join("", [
       "mongodb://",
-      jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["username"], ":",
-      jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["password"], "@",
+      urlencode(jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["username"]), ":",
+      urlencode(jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["password"]), "@",
       aws_docdb_cluster.staging[0].endpoint,
       ":27017/admin?ssl=true&sslInvalidHostNameAllowed=true",
       "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
