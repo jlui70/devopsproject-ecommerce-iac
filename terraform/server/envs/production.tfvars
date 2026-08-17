@@ -20,8 +20,11 @@ control_plane = {
 worker = {
   instance_type = "t3.small"
   ebs_size_gb   = 20
-  asg           = { min = 5, desired = 5, max = 5 }
+  asg           = { min = 6, desired = 6, max = 6 } # teste temporario ADR-0022, ver nota abaixo
 }
+# Teste ao vivo do ADR-0022 em 2026-08-17: subiu de 5 para 6 de proposito, so' para
+# confirmar que o node novo entra sozinho via user_data (sem rodar Ansible depois).
+# Reverter para 5 assim que confirmado.
 
 ecr_repositories = [
   "devopsproject/prod/health-checker",
