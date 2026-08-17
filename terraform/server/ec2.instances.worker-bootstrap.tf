@@ -79,7 +79,14 @@ locals {
     echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/v$${KUBERNETES_VERSION}/deb/ /" > /etc/apt/sources.list.d/cri-o.list
     apt-get update -y
     apt-get install -y cri-o
-    systemctl enable --now cri-o
+    # "cri-o" e' o nome do pacote, mas a unit systemd real e' "crio.service" —
+    # "cri-o.service" e' so' um alias, e systemctl enable recusa operar num alias
+    # ("Refusing to operate on alias name or linked unit file"). O pacote .deb ja
+    # habilita crio via preset no postinst; systemctl start basta (enable e'
+    # idempotente e inofensivo mesmo ja habilitado). Achado ao vivo em 2026-08-17
+    # testando o ADR-0022 — script abortava aqui (set -euo pipefail) antes de
+    # chegar em kubelet/kubeadm, mascarado como "kubeadm join falhou".
+    systemctl enable --now crio
 
     echo "[worker-bootstrap] Instalando kubelet/kubeadm/kubectl $${KUBERNETES_VERSION}..."
     curl -fsSL "https://pkgs.k8s.io/core:/stable:/v$${KUBERNETES_VERSION}/deb/Release.key" | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
