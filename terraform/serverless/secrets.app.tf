@@ -37,7 +37,7 @@ resource "aws_secretsmanager_secret_version" "app" {
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["username"]), ":",
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["password"]), "@",
       aws_docdb_cluster.this[0].endpoint,
-      ":27017/admin?ssl=true&sslInvalidHostNameAllowed=true",
+      ":27017/admin?tls=true&tlsInsecure=true",
       "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
     ])
 
@@ -102,7 +102,7 @@ resource "aws_secretsmanager_secret_version" "app_staging" {
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["username"]), ":",
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["password"]), "@",
       aws_docdb_cluster.staging[0].endpoint,
-      ":27017/admin?ssl=true&sslInvalidHostNameAllowed=true",
+      ":27017/admin?tls=true&tlsInsecure=true",
       "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
     ])
 
