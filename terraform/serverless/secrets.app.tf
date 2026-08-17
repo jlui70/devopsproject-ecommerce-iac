@@ -38,7 +38,7 @@ resource "aws_secretsmanager_secret_version" "app" {
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb[0].secret_string)["password"]), "@",
       aws_docdb_cluster.this[0].endpoint,
       ":27017/admin?tls=true&tlsInsecure=true",
-      "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
+      "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1&retryWrites=false"
     ])
 
     IDENTITY__KEY                   = random_password.identity_key[0].result
@@ -110,7 +110,7 @@ resource "aws_secretsmanager_secret_version" "app_staging" {
       urlencode(jsondecode(aws_secretsmanager_secret_version.docdb_staging[0].secret_string)["password"]), "@",
       aws_docdb_cluster.staging[0].endpoint,
       ":27017/admin?tls=true&tlsInsecure=true",
-      "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1"
+      "&connectTimeoutMS=10000&authSource=admin&authMechanism=SCRAM-SHA-1&retryWrites=false"
     ])
 
     IDENTITY__KEY                   = random_password.identity_key_staging[0].result
