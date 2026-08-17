@@ -137,6 +137,13 @@
   register: ecr_token_output
   changed_when: false
   no_log: true
+  # Precisa da tag ecr-secret-staging tambem: e' pre-requisito da task "Create ECR
+  # image pull secret in staging namespace" mais abaixo. Sem esta tag aqui, rodar o
+  # playbook com --tags ecr-secret-staging pula esta task, ecr_token_output fica
+  # indefinida, e a task de staging falha com erro mascarado por no_log: true
+  # (achado ao vivo em 2026-08-17). Nao afeta o fluxo normal (sem --tags): tasks sem
+  # filtro sempre rodam, independente das tags declaradas.
+  tags: ecr-secret-staging
 
 - name: Create ECR image pull secret in dpe namespace
   ansible.builtin.shell:
