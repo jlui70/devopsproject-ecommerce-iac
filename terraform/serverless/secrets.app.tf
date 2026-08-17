@@ -90,7 +90,14 @@ resource "aws_secretsmanager_secret_version" "app_staging" {
     # endpoint do cluster Aurora -stg.
     CONNECTIONSTRINGS__DEFAULT = join("", [
       "User ID=${var.staging.aurora.master_username};",
-      "Password=${jsondecode(data.aws_secretsmanager_secret_version.aurora_staging_master[0].secret_string)["password"]};",
+      # Senha gerenciada pela AWS (manage_master_user_password) — o gerador padrao
+      # da AWS exclui / @ " e espaco, mas NAO exclui ";" (separador de campo do
+      # Npgsql/ADO.NET). Sem quoting, uma senha sorteada com ";" quebra a connection
+      # string no meio (acha ao vivo em 2026-08-17, mesma classe do bug do Mongo
+      # URI acima, ainda nao disparado por sorte do RNG). Quoting com aspas duplas +
+      # duplicacao de aspas internas e o escaping padrao do Npgsql, seguro para
+      # qualquer caractere na senha.
+      "Password=\"${replace(jsondecode(data.aws_secretsmanager_secret_version.aurora_staging_master[0].secret_string)["password"], "\"", "\"\"")}\";",
       "Host=${aws_rds_cluster.staging[0].endpoint};",
       "Port=5432;",
       "Database=${var.staging.aurora.database_name};",
