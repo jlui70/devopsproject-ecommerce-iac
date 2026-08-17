@@ -14,6 +14,8 @@ module "worker" {
     asg                         = var.worker.asg
     target_group_arns           = []
     suspended_processes         = ["AZRebalance"]
+    # ADR-0022 — auto-join no boot, ver ec2.instances.worker-bootstrap.tf
+    extra_user_data = local.worker_bootstrap_script
     maintenance_policy = {
       min_healthy_percentage = 100
       max_healthy_percentage = 110

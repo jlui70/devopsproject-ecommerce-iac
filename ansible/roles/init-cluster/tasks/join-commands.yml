@@ -47,3 +47,24 @@
   delegate_to: "{{ item }}"
   delegate_facts: true
   loop: "{{ groups['all'] }}"
+
+# ADR-0022 — grava o comando de join atual no SSM Parameter Store a cada execucao
+# (tag always, roda toda vez que o playbook executa, mesmo filtrado). O user_data
+# dos workers (terraform/server/ec2.instances.worker-bootstrap.tf) le este
+# parametro no boot para se auto-unir ao cluster sem depender de reexecucao manual
+# do Ansible — cobre scale-up do Cluster Autoscaler ou ajuste manual do ASG feito
+# DEPOIS que o cluster ja existe (nao cobre o bootstrap inicial, que continua via
+# Ansible completo). IAM: ssm:PutParameter concedido so' ao control plane
+# (iam.control-plane.tf, statement WorkerJoinCommandWrite) — workers ja tem
+# ssm:GetParameter via AmazonSSMManagedInstanceCore, sem IAM adicional.
+- name: Store worker join command in SSM Parameter Store (ADR-0022)
+  ansible.builtin.command:
+    cmd: >
+      aws ssm put-parameter
+      --name /devopsproject/cluster/worker-join-command
+      --value "{{ worker_join_command_output.stdout | trim }}"
+      --type SecureString
+      --overwrite
+      --region us-east-1
+  changed_when: true
+  no_log: true

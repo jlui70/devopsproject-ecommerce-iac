@@ -128,6 +128,24 @@ data "aws_iam_policy_document" "control_plane_inline" {
       "arn:aws:s3:::devopsproject-terraform-state-${data.aws_caller_identity.current.account_id}/*",
     ]
   }
+
+  # ADR-0022 — Ansible (roles/init-cluster/tasks/join-commands.yml) grava o comando
+  # de join atual neste parametro a cada execucao, para o user_data dos workers
+  # (ec2.instances.worker-bootstrap.tf) conseguir ler e auto-unir novos nodes sem
+  # depender de reexecucao manual do Ansible. Leitura pelos workers ja vem de
+  # AmazonSSMManagedInstanceCore (ssm:GetParameter, Resource "*", confirmado antes
+  # de escrever este statement) — so' a escrita, feita pelo control plane, precisa
+  # de permissao explicita (nao esta na policy gerenciada).
+  statement {
+    sid    = "WorkerJoinCommandWrite"
+    effect = "Allow"
+    actions = [
+      "ssm:PutParameter",
+    ]
+    resources = [
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.worker_join_ssm_parameter}",
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "control_plane" {

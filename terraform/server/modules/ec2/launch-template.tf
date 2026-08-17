@@ -4,7 +4,8 @@ resource "aws_launch_template" "this" {
   instance_type = var.config.instance_type
   key_name      = var.config.key_name
 
-  user_data = base64encode(<<-EOF
+  user_data = base64encode(join("\n", [
+    <<-EOF
     #!/bin/bash
     # Install AWS SSM Agent — required for Ansible via SSM (Debian 12 does not ship with it)
     mkdir -p /tmp/ssm
@@ -13,8 +14,10 @@ resource "aws_launch_template" "this" {
     dpkg -i /tmp/ssm/amazon-ssm-agent.deb
     systemctl enable amazon-ssm-agent
     systemctl start amazon-ssm-agent
-  EOF
-  )
+    EOF
+    ,
+    var.config.extra_user_data,
+  ]))
 
   block_device_mappings {
     device_name = "/dev/xvda"

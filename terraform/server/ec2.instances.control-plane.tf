@@ -14,6 +14,9 @@ module "control_plane" {
     asg                         = var.control_plane.asg
     target_group_arns           = [aws_lb_target_group.apiserver.arn]
     suspended_processes         = ["AZRebalance"]
+    # ADR-0022 e' so' para workers (auto-join no boot) — control plane nunca deve
+    # rodar kubeadm join, so' kubeadm init (feito pelo Ansible, roles/init-cluster).
+    extra_user_data = ""
     maintenance_policy = {
       min_healthy_percentage = 100
       max_healthy_percentage = 110
