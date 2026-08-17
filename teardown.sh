@@ -318,6 +318,43 @@ else
   ok "TF_VAR_opensearch_master_password já está definida no ambiente"
 fi
 
+# ─── Senhas de admin da aplicação (achado 2026-08-17 — antes viviam em .tfvars,
+# agora são variáveis top-level sem default, mesmo padrão de aurora_master_password
+# acima; sem elas o destroy da stack serverless — produção E staging — pede
+# interativamente e trava a automação deste script) ──────────────────────────
+
+if [[ -z "${TF_VAR_app_identity_admin_password:-}" ]]; then
+  echo ""
+  warn "A stack serverless requer TF_VAR_app_identity_admin_password para o destroy."
+  echo -n "  Digite a senha de admin (produção) (Enter para pular — Terraform pedirá interativamente): "
+  read -rs _APP_ADMIN_PWD
+  echo ""
+  if [[ -n "$_APP_ADMIN_PWD" ]]; then
+    export TF_VAR_app_identity_admin_password="$_APP_ADMIN_PWD"
+    ok "TF_VAR_app_identity_admin_password exportada"
+  else
+    warn "Senha não fornecida — o destroy da stack serverless pedirá a senha interativamente"
+  fi
+else
+  ok "TF_VAR_app_identity_admin_password já está definida no ambiente"
+fi
+
+if [[ -z "${TF_VAR_staging_app_identity_admin_password:-}" ]]; then
+  echo ""
+  warn "O destroy da state key de staging (serverless) requer TF_VAR_staging_app_identity_admin_password."
+  echo -n "  Digite a senha de admin (staging) (Enter para pular — Terraform pedirá interativamente): "
+  read -rs _STG_APP_ADMIN_PWD
+  echo ""
+  if [[ -n "$_STG_APP_ADMIN_PWD" ]]; then
+    export TF_VAR_staging_app_identity_admin_password="$_STG_APP_ADMIN_PWD"
+    ok "TF_VAR_staging_app_identity_admin_password exportada"
+  else
+    warn "Senha não fornecida — o destroy de staging pedirá a senha interativamente (só relevante se o state de staging existir)"
+  fi
+else
+  ok "TF_VAR_staging_app_identity_admin_password já está definida no ambiente"
+fi
+
 # ─── FASE 4 — Terraform Destroy ─────────────────────────────────────────────
 
 log "FASE 4 — Terraform Destroy (ordem: site → observability → serverless → server → networking)"
@@ -355,6 +392,21 @@ fi
 
 tf_destroy "serverless"
 tf_destroy "server"
+
+# ADR-0022 (2026-08-17): o comando de join dos workers é gravado pelo Ansible via
+# `aws ssm put-parameter` (roles/init-cluster/tasks/join-commands.yml), não é um
+# recurso Terraform — o destroy da stack `server` acima não limpa isso, ficaria
+# órfão. Não quebra o próximo ciclo (Ansible sobrescreve com --overwrite na
+# próxima instalação), mas é limpeza incompleta deixar para trás.
+log "Limpando SSM Parameter do comando de join (ADR-0022, não gerido pelo Terraform)"
+if ! $DRY_RUN; then
+  aws ssm delete-parameter --name /devopsproject/cluster/worker-join-command \
+    --region "$REGION" 2>/dev/null \
+    && ok "SSM Parameter removido" \
+    || warn "SSM Parameter não encontrado (ok se staging/server nunca chegou a rodar Ansible)"
+else
+  run "aws ssm delete-parameter --name /devopsproject/cluster/worker-join-command --region $REGION"
+fi
 
 # networking: Route53 já limpo na fase 3
 tf_destroy "networking" "-refresh=false"
