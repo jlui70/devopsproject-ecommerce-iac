@@ -20,11 +20,13 @@ control_plane = {
 worker = {
   instance_type = "t3.small"
   ebs_size_gb   = 20
-  asg           = { min = 6, desired = 6, max = 6 } # teste temporario ADR-0022, ver nota abaixo
+  asg           = { min = 5, desired = 5, max = 5 }
 }
-# Teste ao vivo do ADR-0022 em 2026-08-17: subiu de 5 para 6 de proposito, so' para
-# confirmar que o node novo entra sozinho via user_data (sem rodar Ansible depois).
-# Reverter para 5 assim que confirmado.
+# Teste ao vivo do ADR-0022 em 2026-08-17: subiu de 5 para 6 temporariamente para
+# validar o auto-join via user_data (ver ec2.instances.worker-bootstrap.tf) — node
+# novo entrou sozinho, Ready em ~90s, sem nenhuma execucao de Ansible. Revertido
+# para 5 (dimensionamento correto para replicaCount:2 nos 6 servicos, ADR-0004)
+# apos confirmar.
 
 ecr_repositories = [
   "devopsproject/prod/health-checker",
