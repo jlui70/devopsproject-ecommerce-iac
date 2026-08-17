@@ -38,3 +38,8 @@ output "worker_instance_role_arn" {
   description = "ARN da IAM role dos worker nodes — consumido por ADR-0007 (observability) para anexar policy do OpenSearch"
   value       = aws_iam_role.worker.arn
 }
+
+output "control_plane_instance_role_arn" {
+  description = "ARN da IAM role dos control plane nodes — consumido por ADR-0007 (observability), role mapping do OpenSearch (Fluent Bit roda como DaemonSet em todos os nodes, inclusive control plane)"
+  value       = aws_iam_role.control_plane.arn
+}
