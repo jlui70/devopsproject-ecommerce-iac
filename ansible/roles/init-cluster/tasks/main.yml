@@ -8,5 +8,16 @@
 - name: Run kubeadm init on first control plane node
   ansible.builtin.include_tasks: kubeadm-init.yml
 
+# tags: always — achado ao vivo em 2026-08-17: worker_join_command e' um fato em
+# memoria (set_fact + delegate_facts), nao persiste entre execucoes separadas do
+# Ansible. Rodar so' `--tags join-workers` (mesmo depois do fix de tags: always nas
+# 3 plays de provisionamento base) falhava com "'HostVarsVars object' has no
+# attribute 'worker_join_command'", porque esta play nao tinha tag nenhuma e por
+# isso era pulada. As tasks deste arquivo (kubeadm token create + upload-certs) sao
+# idempotentes e seguras de sempre rodar — geram um token/certificado novo a cada
+# chamada, sem tocar no cluster ja inicializado. NAO dar tags: always no role
+# init-cluster inteiro (isso incluiria kubeadm-init.yml, que nao deve rodar de novo
+# num cluster ja vivo) — so' neste include_tasks especifico.
 - name: Generate and distribute join commands for workers and control planes
   ansible.builtin.include_tasks: join-commands.yml
+  tags: always
