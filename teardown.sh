@@ -148,14 +148,46 @@ else
   log "1.3 Confirmando ALBs deletados (produção e staging)"
   if ! $DRY_RUN; then
     echo "  aguardando ALBs dpe-ingress/dpe-stg-ingress serem removidos pelo ALB Controller..."
+    ALB_TIMED_OUT=false
     for i in $(seq 1 24); do
       ALB=$(aws elbv2 describe-load-balancers --region "$REGION" \
         --query "LoadBalancers[?contains(LoadBalancerName,'dpe-ingress') || contains(LoadBalancerName,'ingress-stg')].LoadBalancerName" \
         --output text 2>/dev/null || echo "")
       [[ -z "$ALB" ]] && { ok "ALBs removidos"; break; }
       echo -n "  ."; sleep 10
-      [[ $i -eq 24 ]] && warn "ALB(s) ainda existem após 4 min ($ALB) — verifique manualmente antes de continuar (podem ficar órfãos se os nodes forem terminados antes do ALB Controller reconciliar)"
+      [[ $i -eq 24 ]] && ALB_TIMED_OUT=true
     done
+
+    # Achado ao vivo em 2026-08-17: apos 4min o ALB Controller as vezes nao
+    # termina a tempo (nodes ja sendo destruidos), e o ALB fica orfao —
+    # bloqueia terraform destroy da stack server mais adiante com
+    # "DependencyViolation" nas Security Groups (via ENI do ALB) e
+    # "ResourceInUseException" no certificado ACM (listener HTTPS do ALB).
+    # So' um warn aqui nao resolvia — forcar a delecao direta via API.
+    if $ALB_TIMED_OUT; then
+      warn "ALB(s) ainda existem após 4 min ($ALB) — deletando diretamente via API (ALB Controller não terminou a tempo)"
+      for name in $ALB; do
+        arn=$(aws elbv2 describe-load-balancers --names "$name" --region "$REGION" \
+          --query 'LoadBalancers[0].LoadBalancerArn' --output text 2>/dev/null || echo "")
+        if [[ -n "$arn" && "$arn" != "None" ]]; then
+          aws elbv2 delete-load-balancer --load-balancer-arn "$arn" --region "$REGION" 2>&1 \
+            && ok "ALB $name deletado diretamente" \
+            || warn "Falha ao deletar $name diretamente — verifique manualmente antes de continuar"
+        fi
+      done
+      echo "  aguardando ENIs do ALB liberarem (necessário antes do destroy das Security Groups)..."
+      for i in $(seq 1 12); do
+        SG_IDS=$(aws ec2 describe-security-groups --region "$REGION" \
+          --filters "Name=group-name,Values=*worker*,*control-plane*,*alb*" \
+          --query "SecurityGroups[].GroupId" --output text 2>/dev/null || echo "")
+        ENI_COUNT=$(aws ec2 describe-network-interfaces --region "$REGION" \
+          --filters "Name=group-id,Values=$(echo $SG_IDS | tr ' ' ',')" \
+          --query 'length(NetworkInterfaces)' --output text 2>/dev/null || echo "0")
+        [[ "$ENI_COUNT" == "0" ]] && { ok "ENIs liberados"; break; }
+        echo -n "  ."; sleep 10
+        [[ $i -eq 12 ]] && warn "ENIs ainda presentes após 2min — o destroy da stack server pode falhar de novo, verifique manualmente"
+      done
+    fi
   else
     run "aws elbv2 describe-load-balancers --query \"LoadBalancers[?contains(LoadBalancerName,'dpe-ingress') || contains(LoadBalancerName,'ingress-stg')]\""
   fi
