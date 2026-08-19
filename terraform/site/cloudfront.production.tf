@@ -7,13 +7,20 @@ resource "aws_cloudfront_distribution" "production" {
   aliases             = [var.site.domain]
   web_acl_id          = aws_wafv2_web_acl.this.arn
 
-  # IMPORTANT: Two-phase apply required.
-  # The AWS API requires the staging distribution to exist before associating
-  # the continuous deployment policy to the production distribution.
-  # Phase 1: apply with lifecycle ignore_changes active (this file as-is).
-  # Phase 2: remove the ignore_changes block below and apply again to attach
-  #          the continuous_deployment_policy_id.
-  # continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id # Phase 2: uncomment after first apply
+  # IMPORTANT: two independent reasons keep continuous_deployment_policy_id unset here
+  # (confirmed against AWS docs 2026-08-13, docs.aws.amazon.com/.../continuous-deployment-quotas-considerations.html):
+  # 1. HARD BLOCKER, permanent while http_version stays "http2and3": AWS states
+  #    "You cannot use continuous deployment with a distribution that supports HTTP/3" —
+  #    no workaround today. This is the real reason ignore_changes must stay, not just
+  #    apply ordering.
+  # 2. Apply-ordering (separate, resolvable): the AWS API requires the staging
+  #    distribution to exist before associating the policy to the production
+  #    distribution — this part alone would resolve with a "Phase 2" apply.
+  # "Phase 2" (removing the ignore_changes block below) is NOT achievable by re-applying
+  # alone as long as reason 1 holds — it requires either AWS shipping HTTP/3 +
+  # continuous-deployment support, or dropping HTTP/3 from this distribution. Until one
+  # of those happens, treat ignore_changes as permanent, not provisional.
+  # continuous_deployment_policy_id = aws_cloudfront_continuous_deployment_policy.this.id # Phase 2: uncomment only once reason 1 above no longer applies
 
   origin {
     origin_id                = "s3-site"
@@ -139,7 +146,9 @@ resource "aws_cloudfront_distribution" "production" {
     response_page_path = "/index.html"
   }
 
-  # Phase 2: remove this lifecycle block and re-apply to wire up the policy.
+  # See the note near http_version/web_acl_id above: this block is permanent while
+  # http_version = "http2and3" (AWS: HTTP/3 is incompatible with continuous deployment),
+  # not just a first-apply ordering workaround.
   lifecycle {
     ignore_changes = [continuous_deployment_policy_id]
   }

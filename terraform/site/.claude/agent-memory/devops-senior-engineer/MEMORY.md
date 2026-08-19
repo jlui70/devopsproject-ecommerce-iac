@@ -1,1 +1,2 @@
 - [ADR-0007 Observabilidade](project_adr0007_observability.md) — Stack observability/ Terraform + roles fluent-bit e metricbeat Ansible implementadas em 2026-06-27
+- [Emenda ADR-0011 — frontend staging CloudFront](project_adr0011_frontend_staging_cloudfront.md) — S3+CloudFront+Route53+IAM dedicados ao frontend estático de staging, implementado 2026-08-10
