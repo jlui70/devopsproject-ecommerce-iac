@@ -50,13 +50,17 @@ grafana:
       effect: NoSchedule
   nodeSelector:
     node-role.kubernetes.io/control-plane: ""
+  # memory limit dobrado de 256Mi -> 512Mi (achado ao vivo em 2026-08-19, ver
+  # RUNBOOK-deploy-do-zero.md Apendice A.12): 256Mi era insuficiente para a
+  # indexacao bleve (unified storage) do Grafana no boot, causando estouro de
+  # memoria -> liveness probe falhando -> kubelet reiniciando o pod em loop
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 256Mi
+      memory: 512Mi
   service:
     type: NodePort
   adminPassword: "{{ grafana_admin_password }}"
