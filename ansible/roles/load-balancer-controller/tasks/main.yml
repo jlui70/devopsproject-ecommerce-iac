@@ -16,7 +16,7 @@
 - name: Install or upgrade AWS Load Balancer Controller via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller
+      helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller --version {{ load_balancer_controller_chart_version }}
       --namespace kube-system
       --set clusterName={{ cluster_name }}
       --set serviceAccount.create=true

@@ -1,20 +1,40 @@
 #!/usr/bin/env bash
 # teardown.sh — Destroy completo do ambiente ecommerce-devopsproject
-# Automatiza o RUNBOOK-destroy.md. Preserva a stack backend (S3/DynamoDB do state).
-# Baseado na validação de 2026-07-23.
+# Automatiza o RUNBOOK-destroy.md. Baseado na validação de 2026-07-23.
 #
 # Uso:
-#   ./teardown.sh            — executa tudo (fases 1 a 5)
-#   ./teardown.sh --dry-run  — mostra os comandos sem executar
+#   ./teardown.sh            — executa tudo (fases 1 a 5), preservando a stack backend
+#   ./teardown.sh --full     — o mesmo, e TAMBÉM apaga a stack backend, os buckets de
+#                              apoio, os parâmetros SSM e o state local: a conta volta
+#                              ao dia zero e o Estágio 1.1 do RUNBOOK roda sem import
+#   ./teardown.sh --dry-run  — mostra os comandos sem executar (combinável com --full)
+#
+# ADR-0023: --full existe porque a stack backend passou a criar os buckets de apoio
+# (ansible-ssm, patch logs). Numa conta onde eles já existem fora do state, o apply da
+# backend falha com BucketAlreadyOwnedByYou e exige `terraform import`. Para uma
+# demonstração de instalação do zero, é mais limpo zerar a conta.
 
 set -euo pipefail
 
-DRY_RUN=false
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
+# Respeita DRY_RUN vindo do ambiente: `DRY_RUN=true ./script.sh` antes zerava esta
+# variavel e executava de verdade — alguem convencido de estar em dry-run acabava
+# aplicando/destruindo. A flag --dry-run continua funcionando normalmente.
+DRY_RUN="${DRY_RUN:-false}"
+FULL=false
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY_RUN=true ;;
+    --full)    FULL=true ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+  esac
+done
 
 REGION="us-east-1"
 CLUSTER_NAME="ecommerce-devopsproject-cluster"
 TERRAFORM_DIR="$(cd "$(dirname "$0")/terraform" && pwd)"
+STATE_BUCKET="devopsproject-terraform-state-${ACCOUNT_ID:-692430448478}"
+ANSIBLE_SSM_BUCKET="devopsproject-ecommerce-ansible-ssm"
+PATCH_LOGS_BUCKET="devopsproject-production-logs"
 S3_BUCKETS=(
   "ecommerce-devopsproject.com"
   "ecommerce-devopsproject.com-logs"
@@ -314,6 +334,29 @@ PYEOF
   fi
 fi
 
+# ─── Senhas do destroy ──────────────────────────────────────────────────────
+#
+# ADR-0023: as senhas vivem no SSM Parameter Store. Tenta carregá-las de lá antes de
+# perguntar — num ciclo normal isso elimina os quatro prompts interativos abaixo, que
+# só permanecem como fallback (conta antiga, ou parâmetros já apagados por um
+# `teardown.sh --full` anterior).
+for _entry in \
+  "/devopsproject/terraform/aurora-master-password:TF_VAR_aurora_master_password" \
+  "/devopsproject/terraform/app-identity-admin-password:TF_VAR_app_identity_admin_password" \
+  "/devopsproject/terraform/staging-app-identity-admin-password:TF_VAR_staging_app_identity_admin_password" \
+  "/devopsproject/terraform/opensearch-master-password:TF_VAR_opensearch_master_password"; do
+  _name="${_entry%%:*}"; _var="${_entry##*:}"
+  if [[ -z "${!_var:-}" ]]; then
+    _val=$(aws ssm get-parameter --name "$_name" --with-decryption \
+             --query Parameter.Value --output text --region "$REGION" 2>/dev/null || true)
+    if [[ -n "$_val" && "$_val" != "None" ]]; then
+      export "$_var=$_val"
+      ok "$_var carregada do SSM"
+    fi
+  fi
+done
+unset _entry _name _var _val
+
 # ─── Aurora password (necessária para destruir a stack serverless) ───────────
 
 if [[ -z "${TF_VAR_aurora_master_password:-}" ]]; then
@@ -389,7 +432,7 @@ fi
 
 # ─── FASE 4 — Terraform Destroy ─────────────────────────────────────────────
 
-log "FASE 4 — Terraform Destroy (ordem: site → observability → serverless → server → networking)"
+log "FASE 4 — Terraform Destroy (ordem: site → cicd → observability → serverless → server → networking)"
 
 tf_destroy() {
   local stack="$1" extra_args="${2:-}"
@@ -401,25 +444,41 @@ tf_destroy() {
 # site: -refresh=false porque o ALB já foi deletado na fase 1
 tf_destroy "site" "-refresh=false"
 
+# cicd (ADR-0023): OIDC provider + roles de ECR. Depois de `site`, porque as roles
+# de frontend que ficaram em `site` referenciam o OIDC provider daqui via
+# terraform_remote_state — e ANTES de `server`, porque data.terraform_remote_state.server
+# precisa dos outputs (ecr_repository_urls) ainda presentes no state.
+#
+# O guard cobre o caso de a stack nunca ter sido aplicada (conta anterior ao ADR-0023,
+# ou um ciclo interrompido): sem state, o `terraform destroy` ainda avalia o data source
+# e falha com "Unsupported attribute" se o state da `server` ja estiver vazio.
+if aws s3api head-object \
+    --bucket "$STATE_BUCKET" \
+    --key cicd/terraform.tfstate >/dev/null 2>&1; then
+  tf_destroy "cicd"
+else
+  ok "sem state de cicd — nada a destruir"
+fi
+
 # observability: OpenSearch leva 10-15 min
 warn "observability pode levar 10–15 min (OpenSearch)..."
 tf_destroy "observability"
 
-# 2026-08-10 (ADR-0012): staging vive numa state key SEPARADA da mesma stack
-# serverless (serverless/staging/terraform.tfstate) e le SGs/subnet groups de
+# 2026-08-10 (ADR-0012) / ADR-0023: staging vive num WORKSPACE separado da mesma
+# stack serverless (env:/staging/serverless/terraform.tfstate) e le SGs/subnet groups de
 # producao via terraform_remote_state — por isso precisa ser destruida ANTES da
 # serverless de producao (senao o destroy de staging falha tentando ler outputs
 # de um state que ja nao existe mais). Só executa se o state de staging existir
 # (deploy do zero sem staging não cria esse arquivo).
 if aws s3api head-object \
     --bucket devopsproject-terraform-state-692430448478 \
-    --key serverless/staging/terraform.tfstate >/dev/null 2>&1; then
-  log "  destroy: serverless (staging, state key separada)"
-  run "cd \"$TERRAFORM_DIR/serverless\" && terraform init -reconfigure -backend-config=\"key=serverless/staging/terraform.tfstate\" && terraform destroy -var-file=\"envs/production.tfvars\" -var-file=\"envs/staging.tfvars\" -auto-approve"
-  run "cd \"$TERRAFORM_DIR/serverless\" && terraform init -reconfigure -backend-config=\"key=serverless/terraform.tfstate\""
+    --key env:/staging/serverless/terraform.tfstate >/dev/null 2>&1; then
+  log "  destroy: serverless (workspace staging)"
+  run "cd \"$TERRAFORM_DIR/serverless\" && terraform workspace select staging && terraform destroy -var-file=\"envs/production.tfvars\" -var-file=\"envs/staging.tfvars\" -auto-approve"
+  run "cd \"$TERRAFORM_DIR/serverless\" && terraform workspace select default"
   ok "serverless (staging) destruída"
 else
-  ok "sem state de staging (serverless/staging/terraform.tfstate não existe) — nada a destruir"
+  ok "sem state de staging (workspace staging não existe) — nada a destruir"
 fi
 
 tf_destroy "serverless"
@@ -443,7 +502,105 @@ fi
 # networking: Route53 já limpo na fase 3
 tf_destroy "networking" "-refresh=false"
 
-ok "Stack backend preservada (S3 + DynamoDB do Terraform state)"
+# ─── FASE 4.5 — backend e recursos de apoio (somente com --full) ────────────
+
+if $FULL; then
+  log "FASE 4.5 — Destruindo a stack backend e os recursos de apoio (--full)"
+
+  warn "Isto apaga o bucket de state, a tabela de lock, os buckets de apoio e as senhas."
+  warn "Só faz sentido quando NADA precisa ser preservado. NÃO é reversível."
+  # O teardown normal não pergunta nada — comportamento histórico, mantido. Mas --full
+  # apaga o bucket de state, e um bucket de state apagado por engano não volta.
+  if ! $DRY_RUN && [[ "${TEARDOWN_FULL_YES:-}" != "true" ]]; then
+    echo -n "  Digite EXCLUIR para confirmar: "
+    read -r _confirm
+    [[ "$_confirm" == "EXCLUIR" ]] || err "cancelado pelo operador"
+  fi
+
+  # Os buckets de apoio não pertencem a nenhuma stack destruída acima e sobrevivem a um
+  # teardown normal — é justamente por isso que precisam ser tratados aqui.
+  for b in "$ANSIBLE_SSM_BUCKET" "$PATCH_LOGS_BUCKET"; do
+    if aws s3api head-bucket --bucket "$b" >/dev/null 2>&1; then
+      log "  esvaziando e removendo: $b"
+      run "aws s3 rm \"s3://$b\" --recursive --quiet || true"
+      run "aws s3api delete-bucket --bucket \"$b\" --region $REGION"
+      ok "$b removido"
+    else
+      ok "$b não existe"
+    fi
+  done
+
+  # Senhas do ADR-0023 — recriadas pelo Estágio 0 do runbook.
+  for p in /devopsproject/terraform/aurora-master-password \
+           /devopsproject/terraform/app-identity-admin-password \
+           /devopsproject/terraform/staging-app-identity-admin-password \
+           /devopsproject/terraform/opensearch-master-password \
+           /devopsproject/grafana/admin-password \
+           /devopsproject/opensearch/master-password; do
+    if aws ssm get-parameter --name "$p" --region "$REGION" >/dev/null 2>&1; then
+      run "aws ssm delete-parameter --name \"$p\" --region $REGION"
+      ok "parâmetro removido: $p"
+    fi
+  done
+
+  # O bucket de state é versionado: delete-bucket exige remover TODAS as versões e
+  # delete markers, não só os objetos correntes.
+  log "  esvaziando o bucket de state (todas as versões)"
+  if ! $DRY_RUN; then
+    python3 - "$STATE_BUCKET" "$REGION" <<'PYEOF'
+import subprocess, sys, json
+bucket, region = sys.argv[1], sys.argv[2]
+
+def aws(*args):
+    return subprocess.run(["aws", *args], capture_output=True, text=True)
+
+total = 0
+for key in ("Versions", "DeleteMarkers"):
+    # Limite de rodadas: sem ele, um delete-objects que falha em silencio deixa os
+    # mesmos itens na listagem e o while roda para sempre.
+    for _round in range(200):
+        out = aws("s3api", "list-object-versions", "--bucket", bucket,
+                  "--region", region, "--max-items", "500", "--output", "json")
+        if out.returncode != 0:
+            print(f"  aviso: list-object-versions falhou: {out.stderr.strip()[:120]}")
+            break
+        items = (json.loads(out.stdout or "{}") or {}).get(key) or []
+        if not items:
+            break
+        objs = [{"Key": i["Key"], "VersionId": i["VersionId"]} for i in items]
+        rm = aws("s3api", "delete-objects", "--bucket", bucket, "--region", region,
+                 "--delete", json.dumps({"Objects": objs, "Quiet": True}))
+        if rm.returncode != 0:
+            print(f"  ERRO: delete-objects falhou: {rm.stderr.strip()[:160]}")
+            sys.exit(1)
+        total += len(objs)
+    else:
+        print(f"  ERRO: {key} nao esvaziou em 200 rodadas — abortando")
+        sys.exit(1)
+print(f"  {total} objetos/versoes removidos de {bucket}")
+PYEOF
+  else
+    echo -e "  \033[90m[dry-run] remoção de todas as versões de s3://$STATE_BUCKET\033[0m"
+  fi
+
+  # terraform destroy na backend em vez de deletar na mão: mantém o state local
+  # coerente e remove a tabela DynamoDB junto.
+  log "  destroy: backend"
+  run "cd \"$TERRAFORM_DIR/backend\" && terraform destroy -var-file=\"envs/production.tfvars\" -auto-approve"
+
+  # Sem isso, o próximo apply parte de um state que ainda referencia recursos apagados.
+  run "rm -f \"$TERRAFORM_DIR/backend/terraform.tfstate\" \"$TERRAFORM_DIR/backend/terraform.tfstate.backup\""
+
+  # Cada stack guarda em .terraform/ um cache da configuração de backend apontando para
+  # o bucket que acabou de ser apagado. Sem limpar, o `terraform init` do Estágio 1.2 pode
+  # reclamar de backend alterado ou tentar migrar um state que não existe mais.
+  log "  limpando caches .terraform/ das stacks"
+  run "find \"$TERRAFORM_DIR\" -maxdepth 2 -type d -name .terraform -exec rm -rf {} + 2>/dev/null || true"
+
+  ok "Stack backend destruída, state local e caches zerados — conta no dia zero"
+else
+  ok "Stack backend preservada (S3 + DynamoDB do Terraform state)"
+fi
 
 # ─── FASE 5 — verificação final ─────────────────────────────────────────────
 
@@ -479,7 +636,11 @@ if ! $DRY_RUN; then
     --query "DomainNames[].DomainName" --output table 2>/dev/null || true
 
   echo ""
-  echo "S3 buckets restantes (backend + ansible-ssm esperados):"
+  if $FULL; then
+    echo "S3 buckets restantes (nenhum esperado — modo --full):"
+  else
+    echo "S3 buckets restantes (backend + ansible-ssm esperados):"
+  fi
   aws s3 ls --region "$REGION" 2>/dev/null || true
 else
   run "aws ec2 describe-instances / elbv2 / nat-gateways / rds / opensearch / s3 ls"

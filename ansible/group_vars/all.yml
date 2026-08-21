@@ -20,10 +20,40 @@ prometheus_stack_chart_version: "87.19.1"
 cert_manager_chart_version: "v1.17.2"
 kyverno_chart_version: "3.3.7"
 velero_chart_version: "7.2.1"
-# grafana_admin_password: injetar via -e grafana_admin_password='...' ou ansible-vault
+
+# ADR-0023 — versoes que estavam soltas (`latest`, `ref=master`, ou sem --version no
+# helm). Um deploy do zero feito hoje e um feito daqui a seis meses instalavam
+# versoes diferentes do mesmo componente, sem nada no repositorio registrando isso —
+# o oposto de um processo reproduzivel, e uma fonte de "funcionava na semana passada"
+# impossivel de diagnosticar depois.
+cloud_provider_aws_version: "release-1.30"
+metrics_server_version: "v0.7.2"
+fluent_bit_image_tag: "3.1.9"
+fluent_bit_chart_version: "0.47.10"
+argocd_chart_version: "7.7.11"
+argo_rollouts_chart_version: "2.37.7"
+external_secrets_chart_version: "0.10.5"
+load_balancer_controller_chart_version: "1.9.2"
+ebs_csi_driver_chart_version: "2.35.1"
+cluster_autoscaler_chart_version: "9.37.0"
+node_termination_chart_version: "0.21.0"
+# ADR-0023: grafana_admin_password NAO e' mais passado por `-e` na linha de comando.
+# A role kube-prometheus-stack le do SSM Parameter Store (SecureString), mesmo padrao
+# ja usado pela role metricbeat para a senha do OpenSearch. Motivo: a senha aparecia
+# em texto puro em 7 pontos do runbook, no historico do shell e em `ps`.
+# Ainda e' possivel sobrepor com `-e grafana_admin_password=...` (a leitura do SSM so
+# acontece quando a variavel nao esta definida), util em laboratorio.
+grafana_admin_password_ssm_parameter: "/devopsproject/grafana/admin-password"
 ecr_registry: "692430448478.dkr.ecr.us-east-1.amazonaws.com"
 ecr_pull_secret_name: "dpe-ecr-image-pull-credentials-prod"
 # Nome final apos o namePrefix/nameSuffix do kustomize de staging (dpe-stg- / -stg) -
 # achado ao vivo em 2026-08-12, ver comentario nas tasks do role argocd.
 ecr_pull_secret_name_staging: "dpe-stg-ecr-image-pull-credentials-stg"
 gitops_repo_url: "https://github.com/jlui70/devopsproject-ecommerce-gitops"
+
+# ADR-0011/0013 (ambiente staging) + ADR-0023: quando true, a role argocd aplica
+# tambem a Application de staging e cria o pull secret de ECR no namespace `staging`
+# na MESMA execucao do playbook — o que antes exigia um apply manual seguido de
+# `ansible-playbook site.yml --tags ecr-secret-staging` (antigas Fases 10.2 e 10.3).
+# Defina como false para um deploy somente de producao.
+staging_enabled: true

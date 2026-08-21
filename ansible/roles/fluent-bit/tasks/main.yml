@@ -1,4 +1,12 @@
 ---
+# ADR-0023 — esta role depende da stack Terraform `observability`, que passou a ser
+# aplicada no Estagio 2, ANTES do Ansible (Estagio 4). Ate o ADR-0023 a ordem era a
+# inversa (Ansible na Fase 5, observability na Fase 8) e esta role fazia um skip
+# silencioso, imprimindo um `debug` dizendo que seria instalada "quando o playbook
+# for reexecutado" — era exatamente esse skip que criava a antiga Fase 8.4
+# (`ansible-playbook site.yml --tags fluent-bit`), o retrocesso que o ADR-0023
+# elimina. Agora o pre-requisito e' obrigatorio e a ausencia falha alto: um skip
+# silencioso aqui significa cluster sem envio de logs, sem ninguem perceber.
 - name: Check if observability state has a valid opensearch_domain_endpoint output
   ansible.builtin.shell:
     cmd: |
@@ -13,15 +21,19 @@
   changed_when: false
   failed_when: false
 
-- name: Skip Fluent Bit installation (observability stack not deployed yet)
-  ansible.builtin.debug:
-    msg: "Observability state not found or opensearch_domain_endpoint output not ready — Fluent Bit will be installed when the observability stack is deployed and this playbook is re-run."
+- name: Fail if the observability stack has not been applied yet
+  ansible.builtin.fail:
+    msg: >-
+      A stack Terraform `observability` nao foi aplicada (output
+      opensearch_domain_endpoint ausente em
+      s3://{{ terraform_state_bucket }}/observability/terraform.tfstate).
+      Ela faz parte do Estagio 2 do RUNBOOK e precisa estar aplicada antes deste
+      playbook (Estagio 4) — ver ADR-0023. Aplique com:
+      terraform -chdir=terraform/observability apply -var-file=envs/production.tfvars
   when: observability_state.rc != 0
 
 - name: Retrieve OpenSearch outputs from Terraform state
   ansible.builtin.include_tasks: terraform-output.yml
-  when: observability_state.rc == 0
 
 - name: Install Fluent Bit via Helm
   ansible.builtin.include_tasks: install.yml
-  when: observability_state.rc == 0

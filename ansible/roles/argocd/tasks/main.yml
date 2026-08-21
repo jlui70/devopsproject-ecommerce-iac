@@ -44,7 +44,7 @@
 - name: Install or upgrade ArgoCD via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install argocd argo/argo-cd
+      helm upgrade --install argocd argo/argo-cd --version {{ argocd_chart_version }}
       --namespace argocd
       --timeout 300s
   environment:
@@ -106,6 +106,28 @@
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
+
+# ── Aplicar ArgoCD Application de staging (ADR-0011/0013, ADR-0023) ──────────
+# Antes do ADR-0023 este apply era um passo manual do runbook depois do Ansible.
+# Aplicado aqui, o namespace `staging` passa a existir nesta mesma execucao, o que
+# faz o guard do pull secret de staging (mais abaixo) encontrar o namespace e
+# elimina a necessidade de reexecutar o playbook com `--tags ecr-secret-staging`.
+- name: Render ArgoCD staging Application manifest
+  ansible.builtin.template:
+    src: application-staging.yml.j2
+    dest: /tmp/argocd-application-staging.yml
+    mode: "0600"
+  when: staging_enabled | bool
+  tags: ecr-secret-staging
+
+- name: Apply ArgoCD staging Application
+  ansible.builtin.command:
+    cmd: "kubectl apply -f /tmp/argocd-application-staging.yml"
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  changed_when: true
+  when: staging_enabled | bool
+  tags: ecr-secret-staging
 
 # ── ECR Image Pull Secret (aguarda namespace dpe criado pelo ArgoCD) ─────────
 # ATENÇÃO: `failed_when: false` foi removido de propósito (2026-08-10). Com ele, esta
@@ -173,12 +195,24 @@
 # CORRIGIDO (achado ao vivo no deploy do zero de 2026-08-12, Fase 11): o pull secret
 # de ECR nunca era criado no namespace `staging` — só existia no `dpe` (bloco acima).
 # Resultado: todos os pods de staging ficavam em ImagePullBackOff/ErrImagePull com
-# "authentication required", mesmo com a tag de imagem correta. O namespace `staging`
-# so existe depois da Fase 10.0a (Application do ArgoCD de staging aplicada
-# manualmente, e opcional) — por isso este bloco tem tag propria e verifica a
-# existencia do namespace antes de tentar, mesmo padrao ja usado pelo role
-# fluent-bit (skip gracioso se o pre-requisito ainda nao existe).
-- name: Check if staging namespace exists
+# "authentication required", mesmo com a tag de imagem correta.
+#
+# ADR-0023: o namespace `staging` agora e' criado nesta mesma execucao, pelo apply da
+# Application de staging mais acima — nao ha mais o caso "namespace ainda nao existe"
+# quando staging_enabled=true. O guard permanece para cobrir staging_enabled=false
+# (ambiente so' de producao), e nesse caso o skip e' legitimo. Se staging_enabled=true
+# e o namespace mesmo assim nao existir, e' falha de sync do ArgoCD e o playbook para
+# aqui, em vez de seguir e deixar os pods de staging em ImagePullBackOff.
+# Espera de verdade, com retries: o namespace e' criado pelo ArgoCD
+# (CreateNamespace=true) logo apos o apply da Application de staging, alguns passos
+# acima — sem esperar, este guard corre antes do namespace aparecer e o pull secret
+# volta a ser pulado, exatamente a falha que o ADR-0023 esta eliminando.
+#
+# Fica DEPOIS do caminho de producao (dpe) de proposito: se o sync de staging estiver
+# quebrado mas o de producao estiver saudavel, o playbook chega ate aqui e falha com
+# um erro especifico de staging, em vez de parar antes e dar a impressao de que o
+# problema e' geral.
+- name: Wait for the staging namespace to be created by ArgoCD
   ansible.builtin.command:
     cmd: "kubectl get namespace staging"
   environment:
@@ -186,12 +220,27 @@
   register: staging_ns_check
   changed_when: false
   failed_when: false
+  retries: "{{ 8 if (staging_enabled | bool) else 1 }}"
+  delay: 15
+  until: staging_ns_check.rc == 0 or not (staging_enabled | bool)
   tags: ecr-secret-staging
 
-- name: Skip ECR pull secret for staging (namespace nao existe ainda)
+- name: Skip ECR pull secret for staging (staging desabilitado)
   ansible.builtin.debug:
-    msg: "Namespace staging nao existe ainda (Fase 10.0a nao aplicada) — pull secret sera criado quando este playbook for re-executado com --tags ecr-secret-staging, apos aplicar argocd/application-staging.yml."
-  when: staging_ns_check.rc != 0
+    msg: "staging_enabled=false — ambiente de staging nao faz parte deste deploy, pull secret nao e' necessario."
+  when: not (staging_enabled | bool)
+  tags: ecr-secret-staging
+
+- name: Fail if staging namespace is missing while staging is enabled
+  ansible.builtin.fail:
+    msg: >-
+      staging_enabled=true, mas o namespace `staging` nao existe depois do apply da
+      Application do ArgoCD. Isso indica falha de sync (ex.: `kustomize build staging`
+      quebrado no repo GitOps, ou o repo inacessivel). Diagnostico:
+      `kubectl -n argocd get application devopsproject-ecommerce-staging -o yaml`.
+  when:
+    - staging_enabled | bool
+    - staging_ns_check.rc != 0
   tags: ecr-secret-staging
 
 - name: Create ECR image pull secret in staging namespace
@@ -205,7 +254,9 @@
       --dry-run=client -o yaml | kubectl apply -f -
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
-  when: staging_ns_check.rc == 0
+  when:
+    - staging_enabled | bool
+    - staging_ns_check.rc == 0
   changed_when: true
   no_log: true
   tags: ecr-secret-staging
@@ -219,6 +270,8 @@
       --overwrite
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
-  when: staging_ns_check.rc == 0
+  when:
+    - staging_enabled | bool
+    - staging_ns_check.rc == 0
   changed_when: true
   tags: ecr-secret-staging

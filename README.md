@@ -194,7 +194,7 @@ cd ansible/
 ansible-inventory -i production.aws_ec2.yml --list
 
 # Executar o playbook completo
-ansible-playbook -i production.aws_ec2.yml site.yml
+ansible-playbook site.yml   # ansible.cfg já define o inventário; -i é redundante
 ```
 
 O `site.yml` executa as roles na seguinte ordem:
@@ -268,19 +268,23 @@ terraform apply -var-file="envs/production.tfvars"
 
 **Outputs:** `opensearch_endpoint`.
 
-### Instalar agentes no cluster (Ansible)
+### Agentes de observabilidade no cluster
 
-Após o Terraform criar o OpenSearch, executar as roles de observabilidade:
+**Desde o ADR-0023 não há passo separado aqui.** A stack `observability` é aplicada no
+Estágio 2, antes do Ansible (Estágio 4), então o Fluent Bit é instalado na execução única
+de `ansible-playbook site.yml` junto com o resto da plataforma. A role falha alto se a
+stack não existir, em vez de pular em silêncio.
+
+Reexecução cirúrgica, se necessário:
 
 ```bash
 cd ansible/
-
-# Fluent Bit (coleta de logs via SigV4 — usa IMDS hop limit=2 configurado na Stack 3)
-ansible-playbook -i production.aws_ec2.yml site.yml --tags fluent-bit
-
-# Metricbeat (coleta de métricas via usuário/senha)
-ansible-playbook -i production.aws_ec2.yml site.yml --tags metricbeat
+ansible-playbook site.yml --tags fluent-bit
 ```
+
+> A role `metricbeat` foi removida de `site.yml` quando o kube-prometheus-stack passou a
+> cobrir métricas de infraestrutura (ADR-0009). O código da role continua no repositório,
+> mas `--tags metricbeat` não faz nada.
 
 > Verificar que os logs chegam ao OpenSearch: `https://<opensearch_endpoint>/_dashboards`
 

@@ -1,0 +1,34 @@
+# ADR-0011/0013 (ambiente staging) — ADR-0023 (aplicado pelo Ansible, nao mais a mao).
+#
+# Ate o ADR-0023 esta Application era aplicada manualmente (antiga Fase 10.2 do
+# runbook), o que criava o namespace `staging` DEPOIS do Ansible ja ter passado —
+# e por isso o pull secret do ECR de staging tinha de ser criado numa segunda
+# execucao do playbook (`--tags ecr-secret-staging`, antiga Fase 10.3). Aplicando
+# aqui, o namespace existe na mesma execucao e o secret e' criado logo abaixo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devopsproject-ecommerce-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ gitops_repo_url }}
+    targetRevision: HEAD
+    path: staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: {{ ecr_pull_secret_name_staging }}
+      namespace: staging
+      jsonPointers:
+        - /data

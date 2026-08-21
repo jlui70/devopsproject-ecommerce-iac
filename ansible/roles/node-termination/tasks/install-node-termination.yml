@@ -17,6 +17,7 @@
   ansible.builtin.command:
     cmd: >
       helm upgrade --install aws-node-termination-handler eks/aws-node-termination-handler
+      --version {{ node_termination_chart_version }}
       --namespace kube-system
       --set enableSqsTerminationDraining=true
       --set queueURL={{ node_termination_queue_url }}

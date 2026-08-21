@@ -36,7 +36,7 @@
 - name: Install or upgrade Argo Rollouts via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install argo-rollouts argo/argo-rollouts
+      helm upgrade --install argo-rollouts argo/argo-rollouts --version {{ argo_rollouts_chart_version }}
       --namespace argo-rollouts
       --create-namespace
       --timeout 120s

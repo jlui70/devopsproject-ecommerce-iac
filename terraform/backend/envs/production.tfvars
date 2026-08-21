@@ -9,3 +9,8 @@ state_backend = {
   bucket_name = "devopsproject-terraform-state-692430448478"
   table_name  = "devopsproject-terraform-state-locking"
 }
+
+support_buckets = {
+  ansible_ssm_name = "devopsproject-ecommerce-ansible-ssm"
+  patch_logs_name  = "devopsproject-production-logs"
+}

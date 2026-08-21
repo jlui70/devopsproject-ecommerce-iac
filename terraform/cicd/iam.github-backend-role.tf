@@ -1,3 +1,11 @@
+# ADR-0005 (origem) / ADR-0023 (movido de `site` para `cicd`).
+#
+# DEPRECADA — nenhum workflow em devopsproject-ecommerce/.github/workflows/ assume
+# esta role. O push de imagens em CI e' feito por aws_iam_role.github_staging
+# (ADR-0014) e a promocao por aws_iam_role.github_prod. Mantida por ora para nao
+# misturar remocao de recurso com o resequenciamento do ADR-0023; candidata a
+# remocao num ADR proprio.
+
 data "aws_iam_policy_document" "github_backend_trust" {
   statement {
     effect  = "Allow"

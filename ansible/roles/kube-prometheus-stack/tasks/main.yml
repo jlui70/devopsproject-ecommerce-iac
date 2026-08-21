@@ -1,4 +1,45 @@
 ---
+# ADR-0023 — a senha do Grafana vem do SSM Parameter Store (SecureString), semeada
+# uma vez no Estagio 0 do RUNBOOK. Antes era obrigatorio passar
+# `-e grafana_admin_password="..."` em TODA execucao do playbook, o que colocava a
+# senha em texto puro no runbook, no historico do shell e na saida de `ps`.
+# A leitura so' acontece quando a variavel nao foi definida de outra forma, entao um
+# `-e grafana_admin_password=...` continua funcionando como sobreposicao pontual.
+- name: Read Grafana admin password from SSM Parameter Store
+  ansible.builtin.command:
+    cmd: >
+      aws ssm get-parameter
+      --name {{ grafana_admin_password_ssm_parameter }}
+      --with-decryption
+      --query Parameter.Value
+      --output text
+      --region {{ terraform_state_region }}
+  register: grafana_password_output
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: grafana_admin_password is not defined
+
+- name: Set grafana_admin_password from SSM
+  ansible.builtin.set_fact:
+    grafana_admin_password: "{{ grafana_password_output.stdout | trim }}"
+  no_log: true
+  when:
+    - grafana_admin_password is not defined
+    - grafana_password_output.rc | default(1) == 0
+    - (grafana_password_output.stdout | default('') | trim) | length > 0
+
+- name: Fail if the Grafana admin password is unavailable
+  ansible.builtin.fail:
+    msg: >-
+      Senha do Grafana indisponivel: o parametro SSM
+      {{ grafana_admin_password_ssm_parameter }} nao existe ou esta vazio, e
+      grafana_admin_password nao foi passada com -e. Semeie o parametro (Estagio 0
+      do RUNBOOK, ADR-0023):
+      aws ssm put-parameter --name {{ grafana_admin_password_ssm_parameter }}
+      --type SecureString --value '<senha>' --region {{ terraform_state_region }}
+  when: grafana_admin_password is not defined
+
 - name: Add Prometheus community Helm repository
   ansible.builtin.command:
     cmd: "helm repo add prometheus-community https://prometheus-community.github.io/helm-charts"

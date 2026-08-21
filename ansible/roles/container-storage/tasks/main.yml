@@ -16,7 +16,7 @@
 - name: Install or upgrade AWS EBS CSI driver via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver
+      helm upgrade --install aws-ebs-csi-driver aws-ebs-csi-driver/aws-ebs-csi-driver --version {{ ebs_csi_driver_chart_version }}
       --namespace kube-system
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"

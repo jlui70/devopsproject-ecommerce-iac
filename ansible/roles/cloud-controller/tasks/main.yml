@@ -1,7 +1,7 @@
 ---
 - name: Apply AWS Cloud Controller Manager manifests
   ansible.builtin.command:
-    cmd: "kubectl apply -k 'github.com/kubernetes/cloud-provider-aws/examples/existing-cluster/base/?ref=master'"
+    cmd: "kubectl apply -k 'github.com/kubernetes/cloud-provider-aws/examples/existing-cluster/base/?ref={{ cloud_provider_aws_version }}'"
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true

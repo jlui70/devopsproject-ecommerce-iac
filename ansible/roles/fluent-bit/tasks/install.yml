@@ -29,7 +29,7 @@
 - name: Install or upgrade Fluent Bit via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install fluent-bit fluent/fluent-bit
+      helm upgrade --install fluent-bit fluent/fluent-bit --version {{ fluent_bit_chart_version }}
       --namespace logging
       --values /tmp/fluent-bit-values.yaml
       --timeout 45s

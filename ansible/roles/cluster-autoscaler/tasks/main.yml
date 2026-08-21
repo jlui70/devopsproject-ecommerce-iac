@@ -31,6 +31,7 @@
   ansible.builtin.command:
     cmd: >
       helm upgrade --install cluster-autoscaler autoscaler/cluster-autoscaler
+      --version {{ cluster_autoscaler_chart_version }}
       --namespace kube-system
       --set autoDiscovery.clusterName={{ cluster_name }}
       --set awsRegion=us-east-1

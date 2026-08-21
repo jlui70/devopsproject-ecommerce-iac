@@ -24,27 +24,15 @@ output "staging_bucket_name" {
   value       = aws_s3_bucket.staging.bucket
 }
 
-# ADR-0005: GitHub Actions OIDC IAM roles
-output "github_backend_role_arn" {
-  description = "ARN da IAM role para GitHub Actions — push de imagens ECR (backend)"
-  value       = aws_iam_role.github_backend.arn
-}
-
+# ADR-0005 / ADR-0023: as roles de ECR (backend/staging/prod) e o provider OIDC
+# migraram para a stack `cicd`. Aqui ficam apenas as roles de frontend, que escopam
+# permissoes sobre os buckets e distribuicoes desta stack.
 output "github_frontend_role_arn" {
-  description = "ARN da IAM role para GitHub Actions — deploy de assets S3 e invalidacao CloudFront (frontend)"
+  description = "ARN da IAM role para GitHub Actions — deploy de assets S3 e invalidacao CloudFront (frontend de producao)"
   value       = aws_iam_role.github_frontend.arn
 }
 
 # ADR-0014: GitHub Actions OIDC IAM roles por ambiente (gate staging->prod)
-output "github_staging_role_arn" {
-  description = "ARN da IAM role para GitHub Actions — push ECR sha-* e smoke test de staging (ref develop/feature/*)"
-  value       = aws_iam_role.github_staging.arn
-}
-
-output "github_prod_role_arn" {
-  description = "ARN da IAM role para GitHub Actions — promocao de imagem (re-tag release-*), assumivel apenas via GitHub Environment production"
-  value       = aws_iam_role.github_prod.arn
-}
 
 # Emenda ADR-0011 (2026-08-10): frontend estatico do ambiente de aplicacao staging
 output "frontend_staging_role_arn" {

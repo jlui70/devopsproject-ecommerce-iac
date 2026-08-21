@@ -115,14 +115,17 @@ sync_staging_acm() {
 }
 
 sync_staging_pghost() {
-  log "Lendo staging_aurora_writer_endpoint (state key de staging)..."
+  log "Lendo staging_aurora_writer_endpoint (workspace staging)..."
   local serverless_dir="${IAC_ROOT}/terraform/serverless"
   local pghost
+  # ADR-0023: workspace em vez de `terraform init -reconfigure` ida e volta. Alem de
+  # ser um comando so', nao mexe na configuracao de backend do diretorio — o antigo
+  # vaivem deixava o diretorio apontando para a state key errada se o script morresse
+  # no meio.
   ( cd "$serverless_dir"
-    terraform init -reconfigure -backend-config="key=serverless/staging/terraform.tfstate" >/dev/null
-    pghost=$(terraform output -raw staging_aurora_writer_endpoint)
-    terraform init -reconfigure -backend-config="key=serverless/terraform.tfstate" >/dev/null
-    echo "$pghost" > /tmp/.sync-gitops-pghost
+    terraform workspace select staging >/dev/null
+    terraform output -raw staging_aurora_writer_endpoint > /tmp/.sync-gitops-pghost
+    terraform workspace select default >/dev/null
   )
   pghost=$(cat /tmp/.sync-gitops-pghost); rm -f /tmp/.sync-gitops-pghost
   local file="staging/seed-job.yml"

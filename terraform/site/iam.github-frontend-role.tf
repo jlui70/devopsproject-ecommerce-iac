@@ -5,7 +5,7 @@ data "aws_iam_policy_document" "github_frontend_trust" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.github_oidc_provider_arn]
     }
 
     condition {
@@ -59,6 +59,17 @@ data "aws_iam_policy_document" "github_frontend" {
       aws_cloudfront_distribution.production.arn,
       aws_cloudfront_distribution.staging.arn,
     ]
+  }
+
+  # ADR-0023: o workflow resolve o distribution ID pelo alias em runtime, em vez de
+  # receber o ID num secret preenchido a mao. ListDistributions nao aceita restricao
+  # por ARN de recurso no IAM (sempre Resource "*") — o escopo real continua sendo o
+  # CreateInvalidation acima, restrito as distribuicoes desta stack.
+  statement {
+    sid       = "CloudFrontListForAliasLookup"
+    effect    = "Allow"
+    actions   = ["cloudfront:ListDistributions"]
+    resources = ["*"]
   }
 }
 

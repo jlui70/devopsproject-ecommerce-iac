@@ -36,7 +36,7 @@
 - name: Install or upgrade External Secrets Operator via Helm
   ansible.builtin.command:
     cmd: >
-      helm upgrade --install external-secrets external-secrets/external-secrets
+      helm upgrade --install external-secrets external-secrets/external-secrets --version {{ external_secrets_chart_version }}
       --namespace external-secrets
       --create-namespace
       --set installCRDs=true
