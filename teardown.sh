@@ -437,6 +437,12 @@ log "FASE 4 — Terraform Destroy (ordem: site → cicd → observability → se
 tf_destroy() {
   local stack="$1" extra_args="${2:-}"
   log "  destroy: $stack"
+  # `terraform init` antes do destroy: sem ele, uma stack cujo diretorio .terraform nao
+  # existe falha com "Backend initialization required". Isso ficava mascarado enquanto o
+  # cache sobrevivia entre ciclos — o `--full` passou a limpa-lo, e stacks que nunca
+  # chegaram a ser aplicadas neste ciclo (tipicamente `site`, que depende do ALB) caem
+  # exatamente nesse caso. init e' idempotente e barato quando ja inicializado.
+  run "cd \"$TERRAFORM_DIR/$stack\" && terraform init -input=false -reconfigure"
   run "cd \"$TERRAFORM_DIR/$stack\" && terraform destroy -var-file=\"envs/production.tfvars\" -auto-approve $extra_args"
   ok "$stack destruída"
 }
@@ -474,6 +480,7 @@ if aws s3api head-object \
     --bucket devopsproject-terraform-state-692430448478 \
     --key env:/staging/serverless/terraform.tfstate >/dev/null 2>&1; then
   log "  destroy: serverless (workspace staging)"
+  run "cd \"$TERRAFORM_DIR/serverless\" && terraform init -input=false -reconfigure"
   run "cd \"$TERRAFORM_DIR/serverless\" && terraform workspace select staging && terraform destroy -var-file=\"envs/production.tfvars\" -var-file=\"envs/staging.tfvars\" -auto-approve"
   run "cd \"$TERRAFORM_DIR/serverless\" && terraform workspace select default"
   ok "serverless (staging) destruída"
@@ -586,6 +593,7 @@ PYEOF
   # terraform destroy na backend em vez de deletar na mão: mantém o state local
   # coerente e remove a tabela DynamoDB junto.
   log "  destroy: backend"
+  run "cd \"$TERRAFORM_DIR/backend\" && terraform init -input=false"
   run "cd \"$TERRAFORM_DIR/backend\" && terraform destroy -var-file=\"envs/production.tfvars\" -auto-approve"
 
   # Sem isso, o próximo apply parte de um state que ainda referencia recursos apagados.

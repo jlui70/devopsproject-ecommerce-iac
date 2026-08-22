@@ -37,7 +37,6 @@
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
   changed_when: true
-  failed_when: false
   when: external_dns_status.rc != 0
 
 - name: Wait for External DNS pod to be running

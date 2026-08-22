@@ -92,6 +92,20 @@ stage_platform() {
   log "ESTÁGIO 2 — serverless, observability, cicd"
   load_ssm_secrets
 
+  # Passo 2.2 do RUNBOOK. Faltava aqui: num clone novo os diretórios build/ não
+  # existem e o apply da `serverless` falha ao empacotar as Lambdas. Só compila o que
+  # estiver faltando — num clone que já rodou um ciclo, é no-op.
+  log "Verificando os builds das Lambdas"
+  local lam="${TERRAFORM_DIR}/serverless/lambdas" fn
+  for fn in layer order-confirmed report-job; do
+    if [[ -d "${lam}/${fn}/build" ]]; then
+      ok "build presente: ${fn}"
+    else
+      log "  compilando ${fn}"
+      run "cd \"${lam}/${fn}\" && npm install && npm run build"
+    fi
+  done
+
   tf_apply "serverless"
 
   # ADR-0012 + ADR-0023: staging é um WORKSPACE da mesma stack, não uma troca manual

@@ -61,7 +61,7 @@ gen_password() {
 
 seed_ssm_secrets() {
   log "Semeando senhas no SSM Parameter Store (idempotente — nunca sobrescreve)"
-  local entry name value
+  local entry name value generated=false
   for entry in "${SSM_SECRETS[@]}"; do
     name="${entry%%:*}"
     if value=$(ssm_get "$name") && [[ -n "$value" && "$value" != "None" ]]; then
@@ -75,9 +75,12 @@ seed_ssm_secrets() {
     aws ssm put-parameter --name "$name" --type SecureString \
       --value "$(gen_password)" --region "$REGION" >/dev/null
     ok "criado: $name"
+    generated=true
   done
-  warn "As senhas foram geradas automaticamente. Para definir uma manualmente:"
-  echo "    aws ssm put-parameter --name <nome> --type SecureString --value '<senha>' --overwrite --region $REGION"
+  if [[ "$generated" == true ]]; then
+    warn "Alguma(s) senha(s) foram geradas automaticamente. Para definir uma manualmente:"
+    echo "    aws ssm put-parameter --name <nome> --type SecureString --value '<senha>' --overwrite --region $REGION"
+  fi
 }
 
 # Exporta TF_VAR_* / GRAFANA_ADMIN_PASSWORD a partir do SSM. Chamado antes de
